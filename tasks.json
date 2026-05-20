@@ -1,71 +1,57 @@
 [
+ 
   {
     "id": 1,
-    "title": "Project scaffold & folder structure",
-    "instruction": "Create the complete folder and file scaffold for the YouTube Bulk Playlist Manager userscript project. Use the structure defined in the context document (yt-bulk-playlist-context.md).\n\nCreate these empty files with only a top-of-file comment indicating the module name and responsibility:\n- loader.user.js\n- main.js\n- src/core/config.js\n- src/core/logger.js\n- src/core/errors.js\n- src/core/session.js\n- src/ui/state.js\n- src/ui/checkbox.js\n- src/ui/overlay.js\n- src/api/playlists.js\n- src/api/dispatcher.js\n- src/observer.js\n\nAlso create a README.md that explains: what the project does, how to set up the Tampermonkey loader on Windows (allow file:// access), and how the hot-reload workflow works (edit file → F5 = live update)."
-  },
-  {
-    "id": 2,
-    "title": "config.js – constants and log prefix",
-    "instruction": "Implement src/core/config.js.\n\nExport a single frozen CONFIG object containing all constants the project needs:\n- LOG_PREFIX: '[YT-BULK]'\n- BATCH_CHUNK_SIZE: 50\n- CHUNK_DELAY_MS: 500\n- SESSION_POLL_MAX: 10\n- SESSION_POLL_MS: 300\n- OVERLAY_ID: 'yt-bulk-overlay'\n- MANAGED_CLASS: 'yt-bulk-managed'\n- VIDEO_RENDERER: 'ytd-playlist-video-renderer'\n- BROWSE_ENDPOINT: 'https://www.youtube.com/youtubei/v1/browse'\n- EDIT_PLAYLIST_ENDPOINT: 'https://www.youtube.com/youtubei/v1/browse/edit_playlist'\n\nUse Object.freeze() so no module can accidentally mutate it. Add a short JSDoc comment on each key."
-  },
-  {
-    "id": 3,
-    "title": "logger.js – unified console logger",
-    "instruction": "Implement src/core/logger.js. Depends on: src/core/config.js (already created).\n\nExport a Logger object with methods: info, success, warn, error, debug.\nEach method must prepend CONFIG.LOG_PREFIX and a level tag (e.g. '[INFO]', '[SUCCESS]', '[WARN]', '[ERROR]', '[DEBUG]') to every console output.\n- info/success/debug → console.log\n- warn → console.warn\n- error → console.error\n\nAlso export a helper function logGroup(label, fn) that wraps console.group / console.groupEnd around a callback for grouped output.\n\nAll methods must accept rest parameters (...args) and spread them into the console call so objects are inspectable, not stringified."
-  },
-  {
-    "id": 4,
     "title": "errors.js – custom error classes",
     "instruction": "Implement src/core/errors.js. Depends on: src/core/logger.js.\n\nDefine and export these custom Error subclasses:\n1. SessionError – thrown when ytcfg is unavailable after max polling attempts\n2. ApiError – thrown on non-OK HTTP responses; stores .status (HTTP code) and .endpoint properties\n3. InjectionError – thrown when DOM injection fails unexpectedly\n4. ParseError – thrown when API response cannot be parsed into expected shape\n\nEach class must:\n- call super(message) and set this.name correctly\n- include a static factory method fromResponse(res) on ApiError that creates an instance from a fetch Response object\n\nAdd JSDoc to every class."
   },
   {
-    "id": 5,
+    "id": 2,
     "title": "session.js – ytcfg extraction with polling",
     "instruction": "Implement src/core/session.js. Depends on: src/core/config.js, src/core/logger.js, src/core/errors.js.\n\nExport one async function: getSession()\n\nBehavior:\n- Poll window.ytcfg every CONFIG.SESSION_POLL_MS milliseconds, up to CONFIG.SESSION_POLL_MAX attempts\n- Each attempt try to read window.ytcfg?.get('INNERTUBE_API_KEY') and window.ytcfg?.get('INNERTUBE_CONTEXT')\n- If both values are available: resolve with { apiKey, context } and log success including attempt count\n- If max attempts reached without data: reject with a SessionError and log a detailed error explaining what to check (is the user on the right YouTube page? is ytcfg loaded?)\n- Log each polling attempt at debug level\n- Clean up the interval on both success and failure\n\nAlso export a helper getClientVersion(session) that extracts clientVersion from session.context.client for use in API payloads."
   },
   {
-    "id": 6,
+    "id": 3,
     "title": "state.js – selection state manager",
     "instruction": "Implement src/ui/state.js. Depends on: src/core/logger.js.\n\nExport a SelectionState class (singleton pattern – export a single instance as default).\n\nMethods:\n- add(videoId) – add a videoId string, ignore duplicates, log debug\n- remove(videoId) – remove a videoId, log debug\n- toggle(videoId) – add if not present, remove if present\n- clear() – empty the selection, log info\n- getAll() – return a copy of the internal array (never expose the internal array directly)\n- getCount() – return current count\n- has(videoId) – boolean\n\nThe class must fire a custom DOM event 'yt-bulk-selection-changed' on document whenever the selection changes, with detail: { count, ids }. This lets the overlay react without tight coupling.\n\nStore lastCheckedIndex (number|null) for shift+click range select support."
   },
   {
-    "id": 7,
+    "id": 4,
     "title": "checkbox.js – per-row checkbox injection",
     "instruction": "Implement src/ui/checkbox.js. Depends on: src/core/config.js, src/core/logger.js, src/core/errors.js, src/ui/state.js.\n\nExport one function: injectCheckbox(rendererElement)\n\nBehavior:\n1. Return early (with a debug log) if element already has class CONFIG.MANAGED_CLASS\n2. Find a#video-title inside the renderer; if missing, log a warn and return\n3. Extract videoId from the anchor href using URLSearchParams (parse the 'v' param). If missing, log warn with the full href for debugging and return\n4. Create an <input type='checkbox'> element. Set data-video-id attribute\n5. Add a 'change' event listener:\n   - On check: call state.add(videoId)\n   - On uncheck: call state.remove(videoId)\n   - Implement shift+click range select: if event.shiftKey and state.lastCheckedIndex is not null, find all checkboxes currently in the DOM, toggle all between lastCheckedIndex and current index\n   - Update state.lastCheckedIndex after each click\n6. Prepend the checkbox to renderer.querySelector('#content')\n7. Add CONFIG.MANAGED_CLASS to the renderer\n8. Log debug with videoId on success\n9. Wrap in try/catch – on error throw InjectionError with context"
   },
   {
-    "id": 8,
+    "id": 5,
     "title": "overlay.js – floating control panel",
     "instruction": "Implement src/ui/overlay.js. Depends on: src/core/config.js, src/core/logger.js, src/ui/state.js.\n\nExport:\n- createOverlay() – creates and appends the overlay DOM to document.body, returns the element\n- syncOverlayVisibility(count) – show/hide based on count > 0, update the count badge text\n- setOverlayLoading(isLoading) – disable/enable the action button, show/hide a spinner\n- setOverlayError(message) – show an error string inside the overlay (red text), auto-clear after 4 seconds\n- setOverlaySuccess(message) – show a success string (green text), auto-clear after 3 seconds\n- populatePlaylistDropdown(playlists) – receive array of { playlistId, title }, populate a <select> element\n- getSelectedPlaylistId() – return the currently selected playlistId from the dropdown\n\nOverlay HTML structure (inline styles only – no external CSS, no class dependencies on YouTube styles):\n- Fixed position, bottom: 24px, left: 50%, transform: translateX(-50%)\n- Dark background (#212121), white text, border-radius 12px, box-shadow\n- Row layout: [count badge] [playlist dropdown] [Add to Playlist button] [Deselect all button]\n\nListen to 'yt-bulk-selection-changed' event on document to auto-update count badge and visibility.\nDo NOT use position: fixed inside a loop or iframe — this is top-level document only.\nLog info when overlay is created, debug on every visibility toggle."
   },
   {
-    "id": 9,
+    "id": 6,
     "title": "observer.js – MutationObserver for lazy-loaded rows",
     "instruction": "Implement src/observer.js. Depends on: src/core/config.js, src/core/logger.js, src/ui/checkbox.js.\n\nExport:\n- startObserver() – creates and starts a MutationObserver, returns the observer instance\n- stopObserver() – disconnects the observer and logs info\n\nObserver behavior:\n- Observe document.body with { childList: true, subtree: true }\n- For each added node: if it is or contains ytd-playlist-video-renderer elements, call injectCheckbox() on each\n- Also run an initial pass on all existing renderers in the DOM when startObserver() is called (for already-loaded rows)\n- Log the count of renderers found in the initial pass\n- Log debug for each mutation batch (number of added nodes checked)\n- Wrap all mutation callbacks in try/catch and log errors without crashing the observer"
   },
   {
-    "id": 10,
+    "id": 7,
     "title": "playlists.js – fetch user playlist list",
     "instruction": "Implement src/api/playlists.js. Depends on: src/core/config.js, src/core/logger.js, src/core/errors.js, src/core/session.js.\n\nExport one async function: fetchUserPlaylists(session)\n\nBehavior:\n1. POST to CONFIG.BROWSE_ENDPOINT + '?key=' + session.apiKey\n2. Body: { context: session.context, browseId: 'FEmy_videos' }\n3. Headers: Content-Type application/json, credentials: 'include'\n4. Log info before fetch, debug with endpoint+browseId\n5. If res.ok is false: throw ApiError with status and endpoint\n6. Parse JSON response\n7. Extract playlists: navigate the response tree to find items with a playlistId. The path is typically: data.contents.singleColumnBrowseResultsRenderer.tabs[0].tabRenderer.content.sectionListRenderer.contents → find items that have gridPlaylistRenderer or playlistRenderer, extract { playlistId, title: item.title.runs[0].text }\n8. If the expected path does not exist, throw ParseError with a message that includes which key was missing and the full top-level keys of the response for debugging\n9. Log success with count of playlists found\n10. Return array of { playlistId, title }\n\nNote: The YouTube response tree can vary. Wrap the traversal in try/catch and log the raw response at debug level before parsing."
   },
   {
-    "id": 11,
+    "id": 8,
     "title": "dispatcher.js – batch POST to edit_playlist",
     "instruction": "Implement src/api/dispatcher.js. Depends on: src/core/config.js, src/core/logger.js, src/core/errors.js.\n\nExport:\n- dispatchBatch(session, playlistId, videoIds) – main entry point, returns Promise<{ added, failed }>\n- (internal) fetchWithRetry(url, options, maxRetries = 3) – exponential backoff retry wrapper\n- (internal) chunkArray(arr, size) – split array into sub-arrays of max size\n- (internal) sleep(ms) – promise-based delay\n\ndispatchBatch behavior:\n1. Validate inputs: playlistId must be non-empty string, videoIds must be non-empty array. Log error and throw if invalid\n2. Split videoIds into chunks of CONFIG.BATCH_CHUNK_SIZE (max 50)\n3. Log info: total videos, chunk count, target playlistId\n4. For each chunk (sequentially, not parallel):\n   a. Build payload: { context: session.context, playlistId, actions: [{action: 'ACTION_ADD_VIDEO', addedVideoId: id}, ...] }\n   b. Call fetchWithRetry with CONFIG.EDIT_PLAYLIST_ENDPOINT + '?key=' + session.apiKey\n   c. Log success with chunk index and count\n   d. If not last chunk, await sleep(CONFIG.CHUNK_DELAY_MS)\n5. Return { added: videoIds.length, failed: 0 } on full success\n6. On any chunk failure: log error with chunk index and HTTP status, stop processing, rethrow\n\nfetchWithRetry:\n- Retry on 429 (rate limit) with exponential backoff: 1000ms, 2000ms, 4000ms\n- On 401/403: do NOT retry, throw ApiError immediately with message 'Session expired – refresh the YouTube page'\n- On other non-OK: throw ApiError with status\n- Log warn on each retry attempt with delay"
   },
   {
-    "id": 12,
+    "id": 9,
     "title": "main.js – wire all modules together",
     "instruction": "Implement main.js. This is the entry point that wires all modules. Depends on: all previously created files.\n\nExport one async function init() and call it immediately.\n\nFlow:\n1. Log info: 'YT Bulk Playlist Manager initialising...'\n2. Call getSession() – on failure log error and show a visible page notification (simple fixed div at top of page) telling the user ytcfg was not found\n3. Create the overlay (createOverlay())\n4. Start the MutationObserver (startObserver())\n5. Fetch user playlists (fetchUserPlaylists(session)) and populate the dropdown (populatePlaylistDropdown())\n6. Wire the 'Add to Playlist' button click:\n   a. Get selectedPlaylistId from overlay\n   b. Get all selected videoIds from state\n   c. Validate: at least 1 video and 1 playlist selected – show overlay error if not\n   d. setOverlayLoading(true)\n   e. Call dispatchBatch(session, playlistId, videoIds)\n   f. On success: state.clear(), uncheck all checkboxes, setOverlaySuccess('Added X videos!')\n   g. On error: setOverlayError with the error message\n   h. setOverlayLoading(false)\n7. Wire 'Deselect all' button: call state.clear() and uncheck all .yt-bulk-managed checkboxes\n8. Listen for 'yt-navigate-finish' on window – re-call init() on SPA navigation (guard against double-init with a flag)\n9. Log success: 'YT Bulk Playlist Manager ready'\n\nWrap the entire init() body in try/catch. Any unhandled error must be logged via Logger.error with the full error object."
   },
   {
-    "id": 13,
+    "id": 10,
     "title": "loader.user.js – Tampermonkey loader with file:// hot reload",
     "instruction": "Implement loader.user.js. This is the ONLY file that gets pasted into Tampermonkey.\n\nWrite the complete Tampermonkey userscript header with:\n- @name: YT Bulk Playlist Manager – Loader\n- @namespace: https://github.com/local/yt-bulk-manager\n- @version: 1.0.0\n- @description: Loader for local dev – hot reload via file:// require\n- @author: local\n- @match: https://www.youtube.com/playlist?list=*\n- @match: https://www.youtube.com/feed/library\n- @match: https://www.youtube.com/my_videos*\n- @grant: GM_xmlhttpRequest\n- @noframes (prevent injection into embedded iframes)\n- @run-at: document-idle\n- @require: file:///C:/dev/yt-bulk-manager/src/core/config.js\n- @require: file:///C:/dev/yt-bulk-manager/src/core/logger.js\n- @require: file:///C:/dev/yt-bulk-manager/src/core/errors.js\n- @require: file:///C:/dev/yt-bulk-manager/src/core/session.js\n- @require: file:///C:/dev/yt-bulk-manager/src/ui/state.js\n- @require: file:///C:/dev/yt-bulk-manager/src/ui/checkbox.js\n- @require: file:///C:/dev/yt-bulk-manager/src/ui/overlay.js\n- @require: file:///C:/dev/yt-bulk-manager/src/api/playlists.js\n- @require: file:///C:/dev/yt-bulk-manager/src/api/dispatcher.js\n- @require: file:///C:/dev/yt-bulk-manager/src/observer.js\n- @require: file:///C:/dev/yt-bulk-manager/main.js\n\nThe script body should be empty (just a comment: '// All code is loaded via @require above'). \n\nAlso add a README section at the bottom of the file (as a comment block) explaining:\n1. How to enable file:// access in Tampermonkey on Windows (Settings → Security → Allow file:// access)\n2. How to enable it in Chrome extension settings (chrome://extensions → Tampermonkey → Allow access to file URLs)\n3. That the path C:/dev/yt-bulk-manager must match the actual folder on disk\n4. Hot-reload: save any .js file → F5 on YouTube tab → changes are live"
   },
   {
-    "id": 14,
+    "id": 11,
     "title": "Integration test & smoke check",
     "instruction": "Create a file test/smoke-test.js that can be run with Node.js (node test/smoke-test.js) to verify the pure-logic modules work correctly without a browser.\n\nTest the following without any DOM or browser APIs:\n1. config.js: assert all required keys exist on CONFIG and it is frozen (Object.isFrozen)\n2. logger.js: mock console methods and verify each Logger method calls the right console function with the correct prefix '[YT-BULK]'\n3. errors.js: instantiate each error class and verify .name, .message, .status (for ApiError) are set correctly. Test ApiError.fromResponse() with a mock Response-like object\n4. state.js: test add/remove/toggle/clear/has/getAll/getCount in isolation (mock the DOM event by overriding document.dispatchEvent)\n5. dispatcher.js (chunkArray, sleep): unit-test chunkArray([1..105], 50) returns 3 chunks of sizes 50, 50, 5\n\nUse Node.js built-in assert module only (no external test framework). Print PASS or FAIL for each test. Exit with code 1 if any test fails.\n\nAt the top of the file, add mocks for browser globals that the modules reference (window, document, console) so the modules can be require()'d."
   }
