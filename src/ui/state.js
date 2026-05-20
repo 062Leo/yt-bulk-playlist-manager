@@ -18,7 +18,6 @@ class SelectionState {
   add(videoId) {
     if (this._selectedIds.indexOf(videoId) !== -1) return;
     this._selectedIds.push(videoId);
-    Logger.debug('Selection add:', videoId);
     this._notify();
   }
 
@@ -26,7 +25,6 @@ class SelectionState {
     var idx = this._selectedIds.indexOf(videoId);
     if (idx === -1) return;
     this._selectedIds.splice(idx, 1);
-    Logger.debug('Selection remove:', videoId);
     this._notify();
   }
 

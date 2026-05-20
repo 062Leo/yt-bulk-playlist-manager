@@ -1,4 +1,4 @@
-// dispatcher.js – Batch-dispatches add-to-playlist actions to YouTube's edit_playlist endpoint
+// dispatcher.js – Batch-dispatches add/remove actions to YouTube's edit_playlist endpoint
 
 function sleep(ms) {
   return new Promise(function (resolve) {
@@ -53,24 +53,36 @@ function fetchWithRetry(url, options, maxRetries) {
 }
 
 async function dispatchBatch(session, playlistId, videoIds) {
+  return dispatchActions(session, playlistId, videoIds, 'add');
+}
+
+async function dispatchRemove(session, playlistId, videoIds) {
+  return dispatchActions(session, playlistId, videoIds, 'remove');
+}
+
+async function dispatchActions(session, playlistId, videoIds, actionType) {
   if (!playlistId || typeof playlistId !== 'string' || playlistId.trim() === '') {
-    Logger.error('dispatchBatch: playlistId must be a non-empty string');
+    Logger.error('dispatchActions: playlistId must be a non-empty string');
     throw new Error('playlistId must be a non-empty string');
   }
 
   if (!Array.isArray(videoIds) || videoIds.length === 0) {
-    Logger.error('dispatchBatch: videoIds must be a non-empty array');
+    Logger.error('dispatchActions: videoIds must be a non-empty array');
     throw new Error('videoIds must be a non-empty array');
   }
 
   var chunks = chunkArray(videoIds, CONFIG.BATCH_CHUNK_SIZE);
+  var label = actionType === 'remove' ? 'remove from' : 'add to';
 
   Logger.info(
-    'Dispatching ' + videoIds.length + ' videos in ' + chunks.length + ' chunk(s) to playlist ' + playlistId
+    'Dispatching ' + videoIds.length + ' videos to ' + label + ' playlist ' + playlistId + ' in ' + chunks.length + ' chunk(s)'
   );
 
   for (var i = 0; i < chunks.length; i++) {
     var actions = chunks[i].map(function (id) {
+      if (actionType === 'remove') {
+        return { action: 'ACTION_REMOVE_VIDEO', removedVideoId: id };
+      }
       return { action: 'ACTION_ADD_VIDEO', addedVideoId: id };
     });
 
@@ -82,7 +94,10 @@ async function dispatchBatch(session, playlistId, videoIds) {
 
     var endpoint = CONFIG.EDIT_PLAYLIST_ENDPOINT + '?key=' + session.apiKey;
 
-    Logger.debug('Chunk ' + (i + 1) + '/' + chunks.length + ': ' + actions.length + ' action(s)');
+    var headers = { 'Content-Type': 'application/json' };
+    if (session.authHeaders) {
+      Object.assign(headers, session.authHeaders);
+    }
 
     try {
       await fetchWithRetry(
@@ -90,7 +105,7 @@ async function dispatchBatch(session, playlistId, videoIds) {
         {
           method: 'POST',
           credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
+          headers: headers,
           body: JSON.stringify(payload)
         }
       );
@@ -110,7 +125,7 @@ async function dispatchBatch(session, playlistId, videoIds) {
     }
   }
 
-  Logger.success('All ' + videoIds.length + ' video(s) added to playlist ' + playlistId);
+  Logger.success('All ' + videoIds.length + ' video(s) ' + (actionType === 'remove' ? 'removed from' : 'added to') + ' playlist ' + playlistId);
 
-  return { added: videoIds.length, failed: 0 };
+  return { count: videoIds.length };
 }

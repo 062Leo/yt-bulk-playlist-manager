@@ -1,4 +1,4 @@
-// overlay.js – Floating control panel with selection count, playlist dropdown, and dispatch button
+// overlay.js – Floating control panel with selection count, playlist dropdown, and Copy/Move buttons
 
 var _overlayRef = null;
 var _overlayMessageTimer = null;
@@ -13,7 +13,7 @@ function createOverlay() {
   overlay.style.cssText = [
     'display:none',
     'position:fixed',
-    'bottom:24px',
+    'top:24px',
     'left:50%',
     'transform:translateX(-50%)',
     'background:#212121',
@@ -63,17 +63,15 @@ function createOverlay() {
   playlistSelect.appendChild(defaultOption);
 
   playlistSelect.addEventListener('change', function () {
-    var addBtn = document.getElementById('yt-bulk-add-btn');
-    if (addBtn) {
-      addBtn.disabled = !playlistSelect.value;
-    }
+    updateActionButtons();
   });
 
-  // Add to Playlist button
-  var addBtn = document.createElement('button');
-  addBtn.id = 'yt-bulk-add-btn';
-  addBtn.textContent = 'Add to Playlist';
-  addBtn.style.cssText = [
+  // Copy to Playlist button
+  var copyBtn = document.createElement('button');
+  copyBtn.id = 'yt-bulk-copy-btn';
+  copyBtn.textContent = 'Copy';
+  copyBtn.title = 'Copy selected videos to the target playlist';
+  copyBtn.style.cssText = [
     'background:#065fd4',
     'color:#ffffff',
     'border:none',
@@ -83,7 +81,24 @@ function createOverlay() {
     'font-weight:500',
     'cursor:pointer'
   ].join(';');
-  addBtn.disabled = true;
+  copyBtn.disabled = true;
+
+  // Move to Playlist button
+  var moveBtn = document.createElement('button');
+  moveBtn.id = 'yt-bulk-move-btn';
+  moveBtn.textContent = 'Move';
+  moveBtn.title = 'Copy selected videos to target playlist, then remove from current playlist';
+  moveBtn.style.cssText = [
+    'background:#c00',
+    'color:#ffffff',
+    'border:none',
+    'border-radius:18px',
+    'padding:8px 16px',
+    'font-size:14px',
+    'font-weight:500',
+    'cursor:pointer'
+  ].join(';');
+  moveBtn.disabled = true;
 
   // Deselect All button
   var deselectBtn = document.createElement('button');
@@ -105,7 +120,7 @@ function createOverlay() {
   // Spinner (CSS-only rotating ring inside a span)
   var spinner = document.createElement('span');
   spinner.id = 'yt-bulk-spinner';
-  spinner.innerHTML = '\u25E0';
+  spinner.textContent = '\u25E0';
   spinner.style.cssText = [
     'display:none',
     'font-size:18px',
@@ -123,7 +138,8 @@ function createOverlay() {
 
   row.appendChild(countBadge);
   row.appendChild(playlistSelect);
-  row.appendChild(addBtn);
+  row.appendChild(copyBtn);
+  row.appendChild(moveBtn);
   row.appendChild(deselectBtn);
   row.appendChild(spinner);
 
@@ -155,6 +171,26 @@ function createOverlay() {
   return overlay;
 }
 
+function updateActionButtons() {
+  var playlistId = getSelectedPlaylistId();
+  var count = selectionState.getCount();
+
+  var copyBtn = document.getElementById('yt-bulk-copy-btn');
+  var moveBtn = document.getElementById('yt-bulk-move-btn');
+
+  if (copyBtn) copyBtn.disabled = !playlistId || count === 0;
+  if (moveBtn) moveBtn.disabled = !playlistId || count === 0 || !getCurrentPlaylistId();
+}
+
+function getCurrentPlaylistId() {
+  try {
+    var urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('list');
+  } catch (e) {
+    return null;
+  }
+}
+
 function syncOverlayVisibility(count) {
   var overlay = _overlayRef;
   if (!overlay) return;
@@ -167,23 +203,22 @@ function syncOverlayVisibility(count) {
     badge.textContent = count + ' selected';
   }
 
-  // Also update deselect button disabled state
   var deselectBtn = overlay.querySelector('#yt-bulk-deselect-btn');
   if (deselectBtn) {
     deselectBtn.disabled = count === 0;
   }
 
-  Logger.debug('Overlay visibility toggled: count=' + count + ', display=' + (count > 0 ? 'flex' : 'none'));
+  updateActionButtons();
 }
 
 function setOverlayLoading(isLoading) {
   var overlay = _overlayRef;
   if (!overlay) return;
 
-  var addBtn = overlay.querySelector('#yt-bulk-add-btn');
-  if (addBtn) {
-    addBtn.disabled = isLoading || !getSelectedPlaylistId();
-  }
+  var copyBtn = overlay.querySelector('#yt-bulk-copy-btn');
+  var moveBtn = overlay.querySelector('#yt-bulk-move-btn');
+  if (copyBtn) copyBtn.disabled = isLoading || !getSelectedPlaylistId() || selectionState.getCount() === 0;
+  if (moveBtn) moveBtn.disabled = isLoading || !getSelectedPlaylistId() || selectionState.getCount() === 0 || !getCurrentPlaylistId();
 
   var spinner = overlay.querySelector('#yt-bulk-spinner');
   if (spinner) {
@@ -194,8 +229,6 @@ function setOverlayLoading(isLoading) {
   if (select) {
     select.disabled = isLoading;
   }
-
-  Logger.debug('Overlay loading set to:', isLoading);
 }
 
 function _clearMessageTimer() {
@@ -237,6 +270,11 @@ function setOverlaySuccess(message) {
   Logger.success('Overlay success:', message);
 }
 
+function setOverlayWarning(message) {
+  _showMessage(message, '#ffaa00', 5000);
+  Logger.warn('Overlay warning:', message);
+}
+
 function populatePlaylistDropdown(playlists) {
   var overlay = _overlayRef;
   if (!overlay) return;
@@ -244,7 +282,6 @@ function populatePlaylistDropdown(playlists) {
   var select = overlay.querySelector('#yt-bulk-playlist-select');
   if (!select) return;
 
-  // Remove all options except the first (default placeholder)
   while (select.options.length > 1) {
     select.remove(1);
   }
@@ -266,10 +303,7 @@ function populatePlaylistDropdown(playlists) {
     select.appendChild(option);
   }
 
-  var addBtn = overlay.querySelector('#yt-bulk-add-btn');
-  if (addBtn) {
-    addBtn.disabled = true;
-  }
+  updateActionButtons();
 
   Logger.info('Playlist dropdown populated with ' + playlists.length + ' playlist(s)');
 }

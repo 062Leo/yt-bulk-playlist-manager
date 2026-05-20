@@ -3,7 +3,6 @@
 function injectCheckbox(rendererElement) {
   try {
     if (rendererElement.classList.contains(CONFIG.MANAGED_CLASS)) {
-      Logger.debug('Renderer already managed, skipping');
       return;
     }
 
@@ -35,6 +34,21 @@ function injectCheckbox(rendererElement) {
     var checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
     checkbox.setAttribute('data-video-id', videoId);
+    checkbox.style.cssText = [
+      'width:18px',
+      'height:18px',
+      'min-width:18px',
+      'min-height:18px',
+      'flex-shrink:0',
+      'cursor:pointer',
+      'accent-color:#065fd4',
+      'margin:0 12px 0 0',
+      'align-self:center'
+    ].join(';');
+
+    checkbox.addEventListener('click', function (event) {
+      event.stopPropagation();
+    });
 
     checkbox.addEventListener('change', function (event) {
       if (checkbox.checked) {
@@ -93,7 +107,7 @@ function injectCheckbox(rendererElement) {
     content.prepend(checkbox);
     rendererElement.classList.add(CONFIG.MANAGED_CLASS);
 
-    Logger.debug('Checkbox injected for videoId:', videoId);
+
   } catch (e) {
     throw new InjectionError('Failed to inject checkbox: ' + e.message);
   }

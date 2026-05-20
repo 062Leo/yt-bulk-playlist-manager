@@ -7,20 +7,22 @@
 // @match        https://www.youtube.com/playlist?list=*
 // @match        https://www.youtube.com/feed/library
 // @match        https://www.youtube.com/my_videos*
+// @match        https://www.youtube.com/playlist*
 // @grant        GM_xmlhttpRequest
+// @grant        unsafeWindow
 // @noframes
 // @run-at       document-idle
-// @require      file:///C:/dev/yt-bulk-manager/src/core/config.js
-// @require      file:///C:/dev/yt-bulk-manager/src/core/logger.js
-// @require      file:///C:/dev/yt-bulk-manager/src/core/errors.js
-// @require      file:///C:/dev/yt-bulk-manager/src/core/session.js
-// @require      file:///C:/dev/yt-bulk-manager/src/ui/state.js
-// @require      file:///C:/dev/yt-bulk-manager/src/ui/checkbox.js
-// @require      file:///C:/dev/yt-bulk-manager/src/ui/overlay.js
-// @require      file:///C:/dev/yt-bulk-manager/src/api/playlists.js
-// @require      file:///C:/dev/yt-bulk-manager/src/api/dispatcher.js
-// @require      file:///C:/dev/yt-bulk-manager/src/observer.js
-// @require      file:///C:/dev/yt-bulk-manager/main.js
+// @require      file:///C:/LEO/Projekte/GitHub/yt-bulk-playlist-manager/src/core/config.js
+// @require      file:///C:/LEO/Projekte/GitHub/yt-bulk-playlist-manager/src/core/logger.js
+// @require      file:///C:/LEO/Projekte/GitHub/yt-bulk-playlist-manager/src/core/errors.js
+// @require      file:///C:/LEO/Projekte/GitHub/yt-bulk-playlist-manager/src/core/session.js
+// @require      file:///C:/LEO/Projekte/GitHub/yt-bulk-playlist-manager/src/ui/state.js
+// @require      file:///C:/LEO/Projekte/GitHub/yt-bulk-playlist-manager/src/ui/checkbox.js
+// @require      file:///C:/LEO/Projekte/GitHub/yt-bulk-playlist-manager/src/ui/overlay.js
+// @require      file:///C:/LEO/Projekte/GitHub/yt-bulk-playlist-manager/src/api/playlists.js
+// @require      file:///C:/LEO/Projekte/GitHub/yt-bulk-playlist-manager/src/api/dispatcher.js
+// @require      file:///C:/LEO/Projekte/GitHub/yt-bulk-playlist-manager/src/observer.js
+// @require      file:///C:/LEO/Projekte/GitHub/yt-bulk-playlist-manager/main.js
 // ==/UserScript==
 
 // All code is loaded via @require above
@@ -38,9 +40,9 @@
  *    [✓] Allow access to file URLs
  *
  * 3. Paths must match your actual folder on disk:
- *    All @require directives point to: C:/dev/yt-bulk-manager/
+ *    All @require directives point to: C:/LEO/Projekte/GitHub/yt-bulk-playlist-manager/
  *    Make sure your local checkout lives at that exact path,
- *    or update every file:///C:/dev/... path in this file accordingly.
+ *    or update every file:///C:/LEO/... path in this file accordingly.
  *
  * 4. Hot-reload workflow:
  *    - Edit any .js file in the project and save it

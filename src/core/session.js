@@ -1,4 +1,34 @@
-// session.js – Extracts YouTube session credentials (ytcfg API key and context) via polling
+// session.js – Extracts YouTube session credentials (ytcfg API key, context, and SAPISID auth) via polling
+
+function getSapisidCookie() {
+  var match = document.cookie.match(/(?:^|;\s*)SAPISID=([^;]*)/);
+  return match ? match[1] : null;
+}
+
+async function computeSapisidHash(sapisid, origin) {
+  var timestamp = Math.floor(Date.now() / 1000);
+  var message = timestamp + ' ' + sapisid + ' ' + origin;
+  var encoder = new TextEncoder();
+  var data = encoder.encode(message);
+  var hashBuffer = await crypto.subtle.digest('SHA-1', data);
+  var hashArray = Array.from(new Uint8Array(hashBuffer));
+  var hashHex = hashArray.map(function (b) {
+    return b.toString(16).padStart(2, '0');
+  }).join('');
+  return 'SAPISIDHASH ' + timestamp + '_' + hashHex;
+}
+
+async function buildAuthHeaders() {
+  var sapisid = getSapisidCookie();
+  if (!sapisid) return null;
+
+  var origin = window.location.origin;
+  var hash = await computeSapisidHash(sapisid, origin);
+  return {
+    'Authorization': hash,
+    'X-Origin': origin
+  };
+}
 
 function getSession() {
   var maxAttempts = CONFIG.SESSION_POLL_MAX;
@@ -10,19 +40,24 @@ function getSession() {
     var poll = setInterval(function () {
       attempts++;
 
-      Logger.debug('Polling ytcfg – attempt', attempts + '/' + maxAttempts);
-
       try {
-        var apiKey = window.ytcfg && window.ytcfg.get('INNERTUBE_API_KEY');
-        var context = window.ytcfg && window.ytcfg.get('INNERTUBE_CONTEXT');
+        var ytcfg = (typeof unsafeWindow !== 'undefined' ? unsafeWindow : window).ytcfg;
+        var apiKey = ytcfg && ytcfg.get('INNERTUBE_API_KEY');
+        var context = ytcfg && ytcfg.get('INNERTUBE_CONTEXT');
       } catch (e) {
-        Logger.debug('ytcfg.get threw –', e.message);
+        // ytcfg not ready yet
       }
 
       if (apiKey && context) {
         clearInterval(poll);
         Logger.success('Session acquired after', attempts, 'attempt(s)');
-        resolve({ apiKey: apiKey, context: context });
+
+        buildAuthHeaders().then(function (authHeaders) {
+          resolve({ apiKey: apiKey, context: context, authHeaders: authHeaders });
+        }).catch(function () {
+          resolve({ apiKey: apiKey, context: context, authHeaders: null });
+        });
+
         return;
       }
 

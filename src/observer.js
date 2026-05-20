@@ -16,15 +16,11 @@ function startObserver() {
   }
 
   var observer = new MutationObserver(function (mutations) {
-    Logger.debug('Mutation batch: ' + mutations.length + ' mutation record(s), checking added nodes');
-
     for (var m = 0; m < mutations.length; m++) {
       var addedNodes = mutations[m].addedNodes;
-      var nodesChecked = 0;
 
       for (var n = 0; n < addedNodes.length; n++) {
         var node = addedNodes[n];
-        nodesChecked++;
 
         try {
           if (!(node instanceof Element)) continue;
@@ -40,8 +36,6 @@ function startObserver() {
           Logger.error('Mutation callback error:', e.message);
         }
       }
-
-      Logger.debug('Mutation record ' + m + ': ' + nodesChecked + ' added node(s) checked');
     }
   });
 
