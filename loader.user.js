@@ -2,7 +2,7 @@
 // @name         YT Bulk Playlist Manager – Loader
 // @namespace    https://github.com/local/yt-bulk-manager
 // @version      1.0.0
-// @description  Loader for local dev – hot reload via file:// require
+// @description  [DEV] Hot-reload loader – @require's source files from disk. Use the standalone build from dist/ for normal installation.
 // @author       local
 // @match        https://www.youtube.com/playlist?list=*
 // @match        https://www.youtube.com/feed/library
