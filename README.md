@@ -19,7 +19,7 @@ A Tampermonkey/Violentmonkey userscript that adds multi-select checkboxes to You
 ### Option 1: Quick install (end users)
 
 1. Install the [Tampermonkey](https://www.tampermonkey.net/) extension for your browser (Chrome, Firefox, Edge, or Brave).
-2. **[Download the latest release](https://github.com/YOUR_USER/yt-bulk-playlist-manager/releases/latest)** — a `.user.js` file.
+2. **[Download the latest release](https://github.com/LeosArchiv/yt-bulk-playlist-manager/releases/tag/Release)** — a `.user.js` file.
 3. Add the `.user.js` file to Tampermonkey (see Tampermonkey docs for how to install a userscript).
 4. Navigate to any YouTube playlist page — the checkboxes and floating toolbar appear automatically.
 
