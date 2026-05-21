@@ -2,6 +2,25 @@
 
 var _overlayRef = null;
 var _overlayMessageTimer = null;
+var _selectionListener = null;
+
+function destroyOverlay() {
+  if (_selectionListener) {
+    document.removeEventListener('yt-bulk-selection-changed', _selectionListener);
+    _selectionListener = null;
+  }
+  if (_overlayRef) {
+    if (_overlayRef.parentNode) {
+      _overlayRef.parentNode.removeChild(_overlayRef);
+    }
+    _overlayRef = null;
+    Logger.info('Overlay destroyed');
+  }
+  if (_overlayMessageTimer !== null) {
+    clearTimeout(_overlayMessageTimer);
+    _overlayMessageTimer = null;
+  }
+}
 
 function createOverlay() {
   if (_overlayRef) {
@@ -162,10 +181,11 @@ function createOverlay() {
   _overlayRef = overlay;
 
   // Auto-update count and visibility on selection changes
-  document.addEventListener('yt-bulk-selection-changed', function (event) {
+  _selectionListener = function (event) {
     var count = event.detail && typeof event.detail.count === 'number' ? event.detail.count : 0;
     syncOverlayVisibility(count);
-  });
+  };
+  document.addEventListener('yt-bulk-selection-changed', _selectionListener);
 
   Logger.info('Overlay created and appended to document.body');
   return overlay;

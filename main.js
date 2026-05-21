@@ -15,6 +15,14 @@ async function init() {
   try {
     Logger.info('YT Bulk Playlist Manager initialising...');
 
+    // Clean up old observer and overlay from previous navigation
+    stopObserver();
+    destroyOverlay();
+    selectionState.clear();
+
+    var oldError = document.getElementById('yt-bulk-session-error');
+    if (oldError) oldError.remove();
+
     // Acquire session
     try {
       _session = await getSession();
@@ -58,11 +66,9 @@ async function init() {
       setOverlayError('Failed to load playlists');
     }
 
-    // Wire buttons (only once)
-    if (!_buttonListenersWired) {
-      _buttonListenersWired = true;
-      wireButtons();
-    }
+    // Wire buttons (only once per overlay lifecycle)
+    _buttonListenersWired = false;
+    wireButtons();
 
     Logger.success('YT Bulk Playlist Manager ready');
   } catch (err) {

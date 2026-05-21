@@ -1,14 +1,44 @@
 // checkbox.js – Injects checkboxes into ytd-playlist-video-renderer rows with videoId extraction
 
+var _MAX_FIND_DEPTH = 20;
+
 function findPlaylistEditEndpoint(obj) {
   if (!obj || typeof obj !== 'object') return null;
   if (obj.playlistEditEndpoint) return obj.playlistEditEndpoint;
-  for (var key in obj) {
-    if (!obj.hasOwnProperty(key)) continue;
-    var found = findPlaylistEditEndpoint(obj[key]);
-    if (found) return found;
+
+  var visited = new WeakSet();
+  var queue = [{ node: obj, depth: 0 }];
+
+  while (queue.length > 0) {
+    var entry = queue.shift();
+    var current = entry.node;
+    var depth = entry.depth;
+
+    if (depth > _MAX_FIND_DEPTH) continue;
+    if (!current || typeof current !== 'object') continue;
+    if (visited.has(current)) continue;
+    visited.add(current);
+
+    for (var key in current) {
+      if (!current.hasOwnProperty(key)) continue;
+      var val = current[key];
+      if (key === 'playlistEditEndpoint' && val) {
+        return val;
+      }
+      if (typeof val === 'object' && val !== null) {
+        queue.push({ node: val, depth: depth + 1 });
+      }
+    }
   }
+
   return null;
+}
+
+function _findCheckboxIndex(checkbox, allBoxes) {
+  for (var i = 0; i < allBoxes.length; i++) {
+    if (allBoxes[i] === checkbox) return i;
+  }
+  return -1;
 }
 
 function injectCheckbox(rendererElement) {
@@ -84,46 +114,32 @@ function injectCheckbox(rendererElement) {
         selectionState.remove(videoId);
       }
 
-      if (event.shiftKey && selectionState.lastCheckedIndex !== null) {
-        var allCheckboxes = document.querySelectorAll(
-          CONFIG.VIDEO_RENDERER + ' input[type="checkbox"][data-video-id]'
-        );
-        var currentIndex = -1;
-        for (var i = 0; i < allCheckboxes.length; i++) {
-          if (allCheckboxes[i] === checkbox) {
-            currentIndex = i;
-            break;
-          }
-        }
+      var allCbs = document.querySelectorAll(
+        CONFIG.VIDEO_RENDERER + ' input[type="checkbox"][data-video-id]'
+      );
+      var currentIndex = _findCheckboxIndex(checkbox, allCbs);
 
-        if (currentIndex !== -1) {
-          var start = Math.min(selectionState.lastCheckedIndex, currentIndex);
-          var end = Math.max(selectionState.lastCheckedIndex, currentIndex);
+      if (event.shiftKey && selectionState.lastCheckedIndex !== null && currentIndex !== -1) {
+        // Reuse existing allCbs NodeList
+        var start = Math.min(selectionState.lastCheckedIndex, currentIndex);
+        var end = Math.max(selectionState.lastCheckedIndex, currentIndex);
 
-          for (var j = start; j <= end; j++) {
-            var cb = allCheckboxes[j];
-            if (cb !== checkbox && cb.checked !== checkbox.checked) {
-              cb.checked = checkbox.checked;
-              var cid = cb.getAttribute('data-video-id');
-              if (checkbox.checked) {
-                selectionState.add(cid);
-              } else {
-                selectionState.remove(cid);
-              }
+        for (var j = start; j <= end; j++) {
+          var cb = allCbs[j];
+          if (cb !== checkbox && cb.checked !== checkbox.checked) {
+            cb.checked = checkbox.checked;
+            var cid = cb.getAttribute('data-video-id');
+            if (checkbox.checked) {
+              selectionState.add(cid);
+            } else {
+              selectionState.remove(cid);
             }
           }
         }
       }
 
-      var allCheckboxes = document.querySelectorAll(
-        CONFIG.VIDEO_RENDERER + ' input[type="checkbox"][data-video-id]'
-      );
-      for (var k = 0; k < allCheckboxes.length; k++) {
-        if (allCheckboxes[k] === checkbox) {
-          selectionState.lastCheckedIndex = k;
-          break;
-        }
-      }
+      // Update lastCheckedIndex — reuse the same NodeList
+      selectionState.lastCheckedIndex = _findCheckboxIndex(checkbox, allCbs);
     });
 
     var content = rendererElement.querySelector('#content');
