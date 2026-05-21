@@ -23,10 +23,7 @@ cat > "$OUT" << 'HEADER'
 // @version      1.0.0
 // @description  Adds multi-select checkboxes to YouTube playlist pages. Bulk-copy, move, or remove videos across playlists via YouTube's internal API.
 // @author       local
-// @match        https://www.youtube.com/playlist?list=*
-// @match        https://www.youtube.com/feed/library
-// @match        https://www.youtube.com/my_videos*
-// @match        https://www.youtube.com/playlist*
+// @match        https://www.youtube.com/*
 // @grant        GM_xmlhttpRequest
 // @grant        unsafeWindow
 // @noframes

@@ -4,7 +4,15 @@ var _initialising = false;
 var _buttonListenersWired = false;
 var _session = null;
 
+function isPlaylistPage() {
+  return /^https:\/\/www\.youtube\.com\/playlist(\?|$)/.test(window.location.href);
+}
+
 async function init() {
+  // Only fully initialise on playlist pages; on other YouTube pages we
+  // just keep the SPA listener alive so navigation TO a playlist works.
+  if (!isPlaylistPage()) return;
+
   if (_initialising) {
     // Logger.debug('init() already in progress, skipping');
     return;
@@ -386,11 +394,49 @@ function uncheckAll() {
   }
 }
 
-// Re-initialise on SPA (virtual) navigation
-window.addEventListener('yt-navigate-finish', function () {
-  // Logger.info('SPA navigation detected, re-initialising...');
-  init();
-});
+// ─── SPA navigation detection ───────────────────────────────────────────────
+// YouTube uses pushState/replaceState for virtual navigation. The
+// yt-navigate-finish event is unreliable (sometimes doesn't fire at all).
+// Intercepting the history methods is the most robust approach.
+
+var _lastUrl = window.location.href;
+
+function _onUrlChanged() {
+  var url = window.location.href;
+  if (url !== _lastUrl) {
+    _lastUrl = url;
+    // Logger.info('SPA navigation detected, re-initialising...');
+    init();
+  }
+}
+
+(function () {
+  var origPush = history.pushState;
+  var origReplace = history.replaceState;
+
+  history.pushState = function () {
+    origPush.apply(this, arguments);
+    _onUrlChanged();
+  };
+
+  history.replaceState = function () {
+    origReplace.apply(this, arguments);
+    _onUrlChanged();
+  };
+})();
+
+window.addEventListener('popstate', _onUrlChanged);
+window.addEventListener('yt-navigate-finish', _onUrlChanged);
+
+// Polling fallback — YouTube may use the Navigation API, location.assign,
+// or other mechanisms that bypass pushState/replaceState interception.
+setInterval(function () {
+  var url = window.location.href;
+  if (url !== _lastUrl) {
+    _lastUrl = url;
+    init();
+  }
+}, 1000);
 
 // Auto-start on first page load
 init();

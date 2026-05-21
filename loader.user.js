@@ -4,10 +4,7 @@
 // @version      1.0.0
 // @description  [DEV] Hot-reload loader – @require's source files from disk. Use the standalone build from dist/ for normal installation.
 // @author       local
-// @match        https://www.youtube.com/playlist?list=*
-// @match        https://www.youtube.com/feed/library
-// @match        https://www.youtube.com/my_videos*
-// @match        https://www.youtube.com/playlist*
+// @match        https://www.youtube.com/*
 // @grant        GM_xmlhttpRequest
 // @grant        unsafeWindow
 // @noframes
