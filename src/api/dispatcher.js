@@ -64,9 +64,9 @@ async function dispatchRemove(session, playlistId, entries) {
     throw new Error('entries must be a non-empty array');
   }
 
-  Logger.info(
-    'Dispatching remove for ' + entries.length + ' ' + pluralize(entries.length, 'video') + ' from playlist ' + playlistId
-  );
+  // Logger.info(
+  //   'Dispatching remove for ' + entries.length + ' ' + pluralize(entries.length, 'video') + ' from playlist ' + playlistId
+  // );
 
   for (var i = 0; i < entries.length; i++) {
     var entry = entries[i];
@@ -110,14 +110,14 @@ async function dispatchRemove(session, playlistId, entries) {
       throw err;
     }
 
-    Logger.success('Video ' + (i + 1) + '/' + entries.length + ' removed');
+    // Logger.success('Video ' + (i + 1) + '/' + entries.length + ' removed');
 
     if (i < entries.length - 1) {
       await sleep(CONFIG.CHUNK_DELAY_MS);
     }
   }
 
-  Logger.success('All ' + entries.length + ' ' + pluralize(entries.length, 'video') + ' removed from playlist ' + playlistId);
+  // Logger.success('All ' + entries.length + ' ' + pluralize(entries.length, 'video') + ' removed from playlist ' + playlistId);
 
   return { count: entries.length };
 }
@@ -135,9 +135,9 @@ async function dispatchActions(session, playlistId, videoIds, actionType) {
 
   var chunks = chunkArray(videoIds, CONFIG.BATCH_CHUNK_SIZE);
 
-  Logger.info(
-    'Dispatching ' + videoIds.length + ' videos to add to playlist ' + playlistId + ' in ' + chunks.length + ' chunk(s)'
-  );
+  // Logger.info(
+  //   'Dispatching ' + videoIds.length + ' videos to add to playlist ' + playlistId + ' in ' + chunks.length + ' chunk(s)'
+  // );
 
   for (var i = 0; i < chunks.length; i++) {
     var actions = chunks[i].map(function (id) {
@@ -176,14 +176,14 @@ async function dispatchActions(session, playlistId, videoIds, actionType) {
       throw err;
     }
 
-    Logger.success('Chunk ' + (i + 1) + '/' + chunks.length + ' dispatched successfully');
+    // Logger.success('Chunk ' + (i + 1) + '/' + chunks.length + ' dispatched successfully');
 
     if (i < chunks.length - 1) {
       await sleep(CONFIG.CHUNK_DELAY_MS);
     }
   }
 
-  Logger.success('All ' + videoIds.length + ' ' + pluralize(videoIds.length, 'video') + ' added to playlist ' + playlistId);
+  // Logger.success('All ' + videoIds.length + ' ' + pluralize(videoIds.length, 'video') + ' added to playlist ' + playlistId);
 
   return { count: videoIds.length };
 }

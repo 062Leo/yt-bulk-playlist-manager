@@ -39,7 +39,7 @@ class SelectionState {
   clear() {
     this._selectedIds = [];
     this.lastCheckedIndex = null;
-    Logger.info('Selection cleared');
+    // Logger.info('Selection cleared');
     this._notify();
   }
 

@@ -40,7 +40,7 @@ function startObserver() {
   // Only inject checkboxes for renderers inside the actual playlist contents,
   // not in recommended/suggested video sections at the bottom of the page
   var existing = observeTarget.querySelectorAll(rendererSelector);
-  Logger.info('Initial pass: found ' + existing.length + ' existing video renderer(s) in playlist');
+  // Logger.info('Initial pass: found ' + existing.length + ' existing video renderer(s) in playlist');
   for (var i = 0; i < existing.length; i++) {
     try {
       injectCheckbox(existing[i]);
@@ -48,7 +48,7 @@ function startObserver() {
       Logger.error('Initial pass inject failed:', e.message);
     }
   }
-  Logger.info('MutationObserver scoped to:', observeTarget === document.body ? 'document.body (fallback)' : observeTarget.tagName + '#' + (observeTarget.id || '(no-id)'));
+  // Logger.info('MutationObserver scoped to:', observeTarget === document.body ? 'document.body (fallback)' : observeTarget.tagName + '#' + (observeTarget.id || '(no-id)'));
 
   var _pendingNodes = [];
   var _flush = function () {
@@ -77,7 +77,7 @@ function startObserver() {
 
   observer.observe(observeTarget, { childList: true, subtree: true });
   _observerInstance = observer;
-  Logger.info('MutationObserver started');
+  // Logger.info('MutationObserver started');
   return observer;
 }
 
@@ -89,6 +89,6 @@ function stopObserver() {
   if (_observerInstance) {
     _observerInstance.disconnect();
     _observerInstance = null;
-    Logger.info('MutationObserver disconnected');
+    // Logger.info('MutationObserver disconnected');
   }
 }

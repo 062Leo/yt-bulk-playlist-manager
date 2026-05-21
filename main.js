@@ -6,14 +6,14 @@ var _session = null;
 
 async function init() {
   if (_initialising) {
-    Logger.debug('init() already in progress, skipping');
+    // Logger.debug('init() already in progress, skipping');
     return;
   }
 
   _initialising = true;
 
   try {
-    Logger.info('YT Bulk Playlist Manager initialising...');
+    // Logger.info('YT Bulk Playlist Manager initialising...');
 
     // Clean up old observer and overlay from previous navigation
     stopObserver();
@@ -70,7 +70,7 @@ async function init() {
     _buttonListenersWired = false;
     wireButtons();
 
-    Logger.success('YT Bulk Playlist Manager ready');
+    Logger.info('YT Bulk Playlist Manager ready');
   } catch (err) {
     Logger.error('Unhandled error during init:', err);
   } finally {
@@ -124,10 +124,13 @@ function wireButtons() {
       }
 
       setOverlayLoading(true);
+      showProgressDialog();
 
       try {
+        updateProgress('Adding videos to target playlist...', 15);
         await dispatchBatch(_session, playlistId, newIds);
 
+        updateProgress('Finalising...', 90);
         var copiedCount = newIds.length;
         var skippedByPrecheck = videoIds.length - copiedCount;
 
@@ -142,6 +145,7 @@ function wireButtons() {
       } catch (err) {
         setOverlayError(err.message || 'Copy failed');
       } finally {
+        hideProgressDialog();
         setOverlayLoading(false);
       }
     });
@@ -197,11 +201,14 @@ function wireButtons() {
       if (!confirmed) return;
 
       setOverlayLoading(true);
+      showProgressDialog();
 
       try {
         if (newIds.length > 0) {
+          updateProgress('Adding videos to target playlist...', 15);
           await dispatchBatch(_session, playlistId, newIds);
 
+          updateProgress('Fetching setVideoIds for removal...', 50);
           var videoIdToSetId = await fetchPlaylistSetVideoIds(_session, currentPlaylistId, newIds);
           var videoPayloads = [];
           for (var vi = 0; vi < newIds.length; vi++) {
@@ -216,6 +223,7 @@ function wireButtons() {
             });
           }
 
+          updateProgress('Removing from current playlist...', 70);
           try {
             await dispatchRemove(_session, currentPlaylistId, videoPayloads);
           } catch (removeErr) {
@@ -236,6 +244,7 @@ function wireButtons() {
             }
           }
 
+          updateProgress('Done!', 100);
           var skippedByPrecheck = videoIds.length - newIds.length;
           var successMsg = 'Moved ' + newIds.length + ' ' + pluralize(newIds.length, 'video') + '!';
           if (skippedByPrecheck > 0) {
@@ -243,6 +252,7 @@ function wireButtons() {
           }
           setOverlaySuccess(successMsg);
         } else {
+          updateProgress('Removing from current playlist...', 30);
           // All were already in target — user chose "Yes, Delete"
           // Remove all selected from current
           var allVideoIdToSetId = await fetchPlaylistSetVideoIds(_session, currentPlaylistId, videoIds);
@@ -270,6 +280,7 @@ function wireButtons() {
                 if (renderer2) renderer2.remove();
               }
             }
+            updateProgress('Done!', 100);
             setOverlaySuccess('Removed ' + videoIds.length + ' ' + pluralize(videoIds.length, 'video') + ' from current playlist');
           } catch (removeErr) {
             setOverlayError('Failed to remove from current: ' + removeErr.message);
@@ -281,6 +292,7 @@ function wireButtons() {
       } catch (err) {
         setOverlayError(err.message || 'Move failed');
       } finally {
+        hideProgressDialog();
         setOverlayLoading(false);
       }
     });
@@ -311,8 +323,10 @@ function wireButtons() {
       if (!confirmed) return;
 
       setOverlayLoading(true);
+      showProgressDialog();
 
       try {
+        updateProgress('Fetching playlist data...', 10);
         var videoIdToSetId = await fetchPlaylistSetVideoIds(_session, currentPlaylistId, videoIds);
         var videoPayloads = [];
         for (var vi = 0; vi < videoIds.length; vi++) {
@@ -327,6 +341,7 @@ function wireButtons() {
           });
         }
 
+        updateProgress('Removing videos from playlist...', 30);
         var result = await dispatchRemove(_session, currentPlaylistId, videoPayloads);
 
         for (var ri = 0; ri < videoIds.length; ri++) {
@@ -339,12 +354,14 @@ function wireButtons() {
           }
         }
 
+        updateProgress('Done!', 100);
         setOverlaySuccess('Removed ' + result.count + ' ' + pluralize(result.count, 'video') + '!');
         selectionState.clear();
         uncheckAll();
       } catch (err) {
         setOverlayError(err.message || 'Remove failed');
       } finally {
+        hideProgressDialog();
         setOverlayLoading(false);
       }
     });
@@ -371,7 +388,7 @@ function uncheckAll() {
 
 // Re-initialise on SPA (virtual) navigation
 window.addEventListener('yt-navigate-finish', function () {
-  Logger.info('SPA navigation detected, re-initialising...');
+  // Logger.info('SPA navigation detected, re-initialising...');
   init();
 });
 

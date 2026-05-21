@@ -77,7 +77,7 @@ function injectCheckbox(rendererElement) {
     if (rendererElement.data) {
       editEndpointData = findPlaylistEditEndpoint(rendererElement.data);
       if (editEndpointData) {
-        Logger.debug('Extracted playlistEditEndpoint for', videoId);
+        // Logger.debug('Extracted playlistEditEndpoint for', videoId);
       } else {
         Logger.warn('No playlistEditEndpoint found in renderer data for', videoId);
       }
@@ -105,10 +105,11 @@ function injectCheckbox(rendererElement) {
 
     checkbox.addEventListener('click', function (event) {
       event.stopPropagation();
-    });
 
-    checkbox.addEventListener('change', function (event) {
-      if (checkbox.checked) {
+      // checkbox.checked is already the NEW state at click time
+      var isChecked = checkbox.checked;
+
+      if (isChecked) {
         selectionState.add(videoId);
       } else {
         selectionState.remove(videoId);
@@ -119,17 +120,17 @@ function injectCheckbox(rendererElement) {
       );
       var currentIndex = _findCheckboxIndex(checkbox, allCbs);
 
+      // event.shiftKey is available on click (MouseEvent) but NOT on change (Event)
       if (event.shiftKey && selectionState.lastCheckedIndex !== null && currentIndex !== -1) {
-        // Reuse existing allCbs NodeList
         var start = Math.min(selectionState.lastCheckedIndex, currentIndex);
         var end = Math.max(selectionState.lastCheckedIndex, currentIndex);
 
         for (var j = start; j <= end; j++) {
           var cb = allCbs[j];
-          if (cb !== checkbox && cb.checked !== checkbox.checked) {
-            cb.checked = checkbox.checked;
+          if (cb !== checkbox && cb.checked !== isChecked) {
+            cb.checked = isChecked;
             var cid = cb.getAttribute('data-video-id');
-            if (checkbox.checked) {
+            if (isChecked) {
               selectionState.add(cid);
             } else {
               selectionState.remove(cid);
@@ -138,7 +139,6 @@ function injectCheckbox(rendererElement) {
         }
       }
 
-      // Update lastCheckedIndex — reuse the same NodeList
       selectionState.lastCheckedIndex = _findCheckboxIndex(checkbox, allCbs);
     });
 

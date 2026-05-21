@@ -14,7 +14,7 @@ function destroyOverlay() {
       _overlayRef.parentNode.removeChild(_overlayRef);
     }
     _overlayRef = null;
-    Logger.info('Overlay destroyed');
+    // Logger.info('Overlay destroyed');
   }
   if (_overlayMessageTimer !== null) {
     clearTimeout(_overlayMessageTimer);
@@ -205,7 +205,7 @@ function createOverlay() {
   };
   document.addEventListener('yt-bulk-selection-changed', _selectionListener);
 
-  Logger.info('Overlay created and appended to document.body');
+    // Logger.info('Overlay created and appended to document.body');
   return overlay;
 }
 
@@ -421,7 +421,7 @@ function setOverlayError(message) {
 
 function setOverlaySuccess(message) {
   _showMessage(message, '#4caf50', 3000);
-  Logger.success('Overlay success:', message);
+  // Logger.success('Overlay success:', message);
 }
 
 function setOverlayWarning(message) {
@@ -459,7 +459,7 @@ function populatePlaylistDropdown(playlists) {
 
   updateActionButtons();
 
-  Logger.info('Playlist dropdown populated with ' + playlists.length + ' playlist(s)');
+  // Logger.info('Playlist dropdown populated with ' + playlists.length + ' playlist(s)');
 }
 
 function getSelectedPlaylistId() {
@@ -470,4 +470,103 @@ function getSelectedPlaylistId() {
   if (!select || !select.value) return null;
 
   return select.value;
+}
+
+// ─── Progress dialog ──────────────────────────────────────────────────────────
+
+var _progressRef = null;
+var _progressBarRef = null;
+var _progressTextRef = null;
+
+function showProgressDialog() {
+  var existing = document.getElementById('yt-bulk-progress-dialog');
+  if (existing) existing.remove();
+
+  var backdrop = document.createElement('div');
+  backdrop.id = 'yt-bulk-progress-dialog';
+  backdrop.style.cssText = [
+    'position:fixed',
+    'top:0','left:0','right:0','bottom:0',
+    'background:rgba(0,0,0,0.6)',
+    'z-index:10000',
+    'display:flex',
+    'align-items:center',
+    'justify-content:center',
+    'font-family:"Roboto","Arial",sans-serif'
+  ].join(';');
+
+  var box = document.createElement('div');
+  box.style.cssText = [
+    'background:#212121',
+    'color:#fff',
+    'border-radius:12px',
+    'padding:32px 40px',
+    'max-width:480px',
+    'width:90%',
+    'box-shadow:0 8px 32px rgba(0,0,0,0.5)',
+    'text-align:center'
+  ].join(';');
+
+  var titleEl = document.createElement('div');
+  titleEl.textContent = '\u23F3  Processing...';
+  titleEl.style.cssText = 'font-size:20px;font-weight:600;margin-bottom:16px;';
+
+  var barOuter = document.createElement('div');
+  barOuter.style.cssText = [
+    'width:100%',
+    'height:8px',
+    'background:#444',
+    'border-radius:4px',
+    'overflow:hidden',
+    'margin-bottom:16px'
+  ].join(';');
+
+  var barInner = document.createElement('div');
+  barInner.id = 'yt-bulk-progress-bar';
+  barInner.style.cssText = [
+    'width:0%',
+    'height:100%',
+    'background:#065fd4',
+    'border-radius:4px',
+    'transition:width 0.3s ease'
+  ].join(';');
+  barOuter.appendChild(barInner);
+
+  var textEl = document.createElement('div');
+  textEl.id = 'yt-bulk-progress-text';
+  textEl.textContent = 'Starting...';
+  textEl.style.cssText = 'font-size:15px;color:#ccc;margin-bottom:20px;line-height:1.5;';
+
+  var noteEl = document.createElement('div');
+  noteEl.textContent = 'Please wait \u2014 do not close or leave this tab.';
+  noteEl.style.cssText = 'font-size:13px;color:#888;';
+
+  box.appendChild(titleEl);
+  box.appendChild(barOuter);
+  box.appendChild(textEl);
+  box.appendChild(noteEl);
+  backdrop.appendChild(box);
+  document.body.appendChild(backdrop);
+
+  _progressRef = backdrop;
+  _progressBarRef = barInner;
+  _progressTextRef = textEl;
+}
+
+function updateProgress(message, percent) {
+  if (_progressTextRef) {
+    _progressTextRef.textContent = message;
+  }
+  if (_progressBarRef && typeof percent === 'number') {
+    _progressBarRef.style.width = Math.min(100, Math.max(0, percent)) + '%';
+  }
+}
+
+function hideProgressDialog() {
+  if (_progressRef) {
+    _progressRef.remove();
+    _progressRef = null;
+    _progressBarRef = null;
+    _progressTextRef = null;
+  }
 }

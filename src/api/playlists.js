@@ -4,7 +4,7 @@ async function fetchUserPlaylists(session) {
   var endpoint = CONFIG.BROWSE_ENDPOINT + '?key=' + session.apiKey;
   var browseId = 'FEplaylist_aggregation';
 
-  Logger.info('Fetching user playlists...');
+  // Logger.info('Fetching user playlists...');
 
   var headers = { 'Content-Type': 'application/json' };
   if (session.authHeaders) {
@@ -125,7 +125,7 @@ async function fetchUserPlaylists(session) {
     }
   }
 
-  Logger.success('Fetched', playlists.length, 'playlist(s)');
+  // Logger.success('Fetched', playlists.length, 'playlist(s)');
   return playlists;
 }
 
@@ -174,7 +174,7 @@ async function fetchPlaylistSetVideoIds(session, playlistId, targetVideoIds, max
 
     var data = await res.json();
 
-    Logger.debug('fetchPlaylistSetVideoIds page', page, 'response keys:', Object.keys(data).join(', '));
+    // Logger.debug('fetchPlaylistSetVideoIds page', page, 'response keys:', Object.keys(data).join(', '));
 
     var contents = null;
     try {
@@ -185,7 +185,7 @@ async function fetchPlaylistSetVideoIds(session, playlistId, targetVideoIds, max
         } else if (data.continuationContents && data.continuationContents.playlistVideoListContinuation) {
           contents = data.continuationContents.playlistVideoListContinuation.contents;
         } else {
-          Logger.debug('fetchPlaylistSetVideoIds: unknown continuation response format');
+          // Logger.debug('fetchPlaylistSetVideoIds: unknown continuation response format');
         }
       } else {
         var topContents = data.contents;
@@ -246,7 +246,7 @@ async function fetchPlaylistSetVideoIds(session, playlistId, targetVideoIds, max
       break;
     }
 
-    Logger.debug('fetchPlaylistSetVideoIds: found', contents.length, 'items on page', page);
+    // Logger.debug('fetchPlaylistSetVideoIds: found', contents.length, 'items on page', page);
 
     for (var c = 0; c < contents.length; c++) {
       var item = contents[c];
@@ -300,7 +300,7 @@ async function fetchPlaylistSetVideoIds(session, playlistId, targetVideoIds, max
     if (!continuationToken) break;
   }
 
-  Logger.debug('fetchPlaylistSetVideoIds result:', JSON.stringify(videoIdToSetId));
+  // Logger.debug('fetchPlaylistSetVideoIds result:', JSON.stringify(videoIdToSetId));
 
   return videoIdToSetId;
 }
@@ -359,7 +359,7 @@ async function fetchPlaylistVideoIds(session, playlistId, targetIds, maxPages) {
         } else if (data.continuationContents && data.continuationContents.playlistVideoListContinuation) {
           contents = data.continuationContents.playlistVideoListContinuation.contents;
         } else {
-          Logger.debug('fetchPlaylistVideoIds: unknown continuation response format');
+          // Logger.debug('fetchPlaylistVideoIds: unknown continuation response format');
         }
       } else {
         var topContents = data.contents;
@@ -457,6 +457,6 @@ async function fetchPlaylistVideoIds(session, playlistId, targetIds, maxPages) {
     if (!continuationToken) break;
   }
 
-  Logger.debug('fetchPlaylistVideoIds found', foundIds.length, 'of', targetIds.length, 'target ' + pluralize(targetIds.length, 'video') + ' in playlist', playlistId);
+  // Logger.debug('fetchPlaylistVideoIds found', foundIds.length, 'of', targetIds.length, 'target ' + pluralize(targetIds.length, 'video') + ' in playlist', playlistId);
   return foundIds;
 }

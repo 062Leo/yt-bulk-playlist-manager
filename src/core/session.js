@@ -50,7 +50,7 @@ function getSession() {
 
       if (apiKey && context) {
         clearInterval(poll);
-        Logger.success('Session acquired after', attempts, 'attempt(s)');
+        // Logger.success('Session acquired after', attempts, 'attempt(s)');
 
         buildAuthHeaders().then(function (authHeaders) {
           resolve({ apiKey: apiKey, context: context, authHeaders: authHeaders });
