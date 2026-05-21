@@ -92,10 +92,10 @@ function injectCheckbox(rendererElement) {
       checkbox.setAttribute('data-playlist-edit', JSON.stringify(editEndpointData));
     }
     checkbox.style.cssText = [
-      'width:18px',
-      'height:18px',
-      'min-width:18px',
-      'min-height:18px',
+      'width:28px',
+      'height:28px',
+      'min-width:28px',
+      'min-height:28px',
       'flex-shrink:0',
       'cursor:pointer',
       'accent-color:#065fd4',

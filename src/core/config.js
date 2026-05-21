@@ -31,3 +31,7 @@ const CONFIG = Object.freeze({
   /** YouTube internal endpoint for batch-editing playlists (add/remove videos). */
   EDIT_PLAYLIST_ENDPOINT: 'https://www.youtube.com/youtubei/v1/browse/edit_playlist',
 });
+
+function pluralize(count, singular, plural) {
+  return count === 1 ? singular : (plural || singular + 's');
+}

@@ -119,6 +119,23 @@ function createOverlay() {
   ].join(';');
   moveBtn.disabled = true;
 
+  // Remove from current playlist button
+  var removeBtn = document.createElement('button');
+  removeBtn.id = 'yt-bulk-remove-btn';
+  removeBtn.textContent = 'Remove';
+  removeBtn.title = 'Remove selected videos from the current playlist';
+  removeBtn.style.cssText = [
+    'background:#c00',
+    'color:#ffffff',
+    'border:none',
+    'border-radius:18px',
+    'padding:8px 16px',
+    'font-size:14px',
+    'font-weight:500',
+    'cursor:pointer'
+  ].join(';');
+  removeBtn.disabled = true;
+
   // Deselect All button
   var deselectBtn = document.createElement('button');
   deselectBtn.id = 'yt-bulk-deselect-btn';
@@ -159,6 +176,7 @@ function createOverlay() {
   row.appendChild(playlistSelect);
   row.appendChild(copyBtn);
   row.appendChild(moveBtn);
+  row.appendChild(removeBtn);
   row.appendChild(deselectBtn);
   row.appendChild(spinner);
 
@@ -194,12 +212,15 @@ function createOverlay() {
 function updateActionButtons() {
   var playlistId = getSelectedPlaylistId();
   var count = selectionState.getCount();
+  var isOnPlaylist = !!getCurrentPlaylistId();
 
   var copyBtn = document.getElementById('yt-bulk-copy-btn');
   var moveBtn = document.getElementById('yt-bulk-move-btn');
+  var removeBtn = document.getElementById('yt-bulk-remove-btn');
 
   if (copyBtn) copyBtn.disabled = !playlistId || count === 0;
-  if (moveBtn) moveBtn.disabled = !playlistId || count === 0 || !getCurrentPlaylistId();
+  if (moveBtn) moveBtn.disabled = !playlistId || count === 0 || !isOnPlaylist;
+  if (removeBtn) removeBtn.disabled = !isOnPlaylist || count === 0;
 }
 
 function getCurrentPlaylistId() {
@@ -231,14 +252,127 @@ function syncOverlayVisibility(count) {
   updateActionButtons();
 }
 
+function showConfirmDialog(title, description, type, confirmLabel) {
+  if (type === undefined) type = 'info';
+  var isWarning = type === 'warning';
+  if (confirmLabel === undefined) {
+    confirmLabel = isWarning ? 'Proceed' : 'Confirm';
+  }
+
+  return new Promise(function (resolve) {
+    var existing = document.getElementById('yt-bulk-confirm-dialog');
+    if (existing) existing.remove();
+
+    var backdrop = document.createElement('div');
+    backdrop.id = 'yt-bulk-confirm-dialog';
+    backdrop.style.cssText = [
+      'position:fixed',
+      'top:0','left:0','right:0','bottom:0',
+      'background:rgba(0,0,0,0.6)',
+      'z-index:10000',
+      'display:flex',
+      'align-items:center',
+      'justify-content:center',
+      'font-family:"Roboto","Arial",sans-serif'
+    ].join(';');
+
+    var boxCss = [
+      'background:#212121',
+      'color:#fff',
+      'border-radius:12px',
+      'padding:32px',
+      'max-width:520px',
+      'width:92%',
+      'box-shadow:0 8px 32px rgba(0,0,0,0.5)',
+      'text-align:center'
+    ];
+    if (isWarning) {
+      boxCss.push('border:2px solid #ffaa00');
+    }
+    var box = document.createElement('div');
+    box.style.cssText = boxCss.join(';');
+
+    var titleEl = document.createElement('div');
+    if (isWarning) {
+      titleEl.textContent = '\u26A0\uFE0F  WARNING  \u26A0\uFE0F';
+      titleEl.style.cssText = 'font-size:24px;font-weight:700;margin-bottom:4px;color:#ffaa00;';
+      box.appendChild(titleEl);
+
+      if (title !== '') {
+        var subtitleEl = document.createElement('div');
+        subtitleEl.textContent = title;
+        subtitleEl.style.cssText = 'font-size:18px;font-weight:500;color:#ccc;margin-bottom:12px;';
+        box.appendChild(subtitleEl);
+      }
+    } else {
+      titleEl.textContent = title;
+      titleEl.style.cssText = 'font-size:22px;font-weight:600;margin-bottom:12px;';
+      box.appendChild(titleEl);
+    }
+
+    var descEl = document.createElement('div');
+    descEl.textContent = description;
+    descEl.style.cssText = isWarning
+      ? 'font-size:16px;color:#ddd;margin-bottom:24px;line-height:1.6;'
+      : 'font-size:16px;color:#aaa;margin-bottom:24px;line-height:1.6;';
+    box.appendChild(descEl);
+
+    var btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex;gap:16px;justify-content:center;';
+
+    var cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.style.cssText = [
+      'background:transparent',
+      'color:#aaa',
+      'border:1px solid #555',
+      'border-radius:18px',
+      'padding:10px 28px',
+      'font-size:16px',
+      'cursor:pointer'
+    ].join(';');
+
+    var confirmBtn = document.createElement('button');
+    confirmBtn.textContent = confirmLabel;
+    confirmBtn.style.cssText = [
+      isWarning ? 'background:#ffaa00' : 'background:#065fd4',
+      'color:#fff',
+      'border:none',
+      'border-radius:18px',
+      'padding:10px 28px',
+      'font-size:16px',
+      'font-weight:600',
+      'cursor:pointer'
+    ].join(';');
+
+    cancelBtn.addEventListener('click', function () {
+      backdrop.remove();
+      resolve(false);
+    });
+
+    confirmBtn.addEventListener('click', function () {
+      backdrop.remove();
+      resolve(true);
+    });
+
+    btnRow.appendChild(cancelBtn);
+    btnRow.appendChild(confirmBtn);
+    box.appendChild(btnRow);
+    backdrop.appendChild(box);
+    document.body.appendChild(backdrop);
+  });
+}
+
 function setOverlayLoading(isLoading) {
   var overlay = _overlayRef;
   if (!overlay) return;
 
   var copyBtn = overlay.querySelector('#yt-bulk-copy-btn');
   var moveBtn = overlay.querySelector('#yt-bulk-move-btn');
+  var removeBtn = overlay.querySelector('#yt-bulk-remove-btn');
   if (copyBtn) copyBtn.disabled = isLoading || !getSelectedPlaylistId() || selectionState.getCount() === 0;
   if (moveBtn) moveBtn.disabled = isLoading || !getSelectedPlaylistId() || selectionState.getCount() === 0 || !getCurrentPlaylistId();
+  if (removeBtn) removeBtn.disabled = isLoading || selectionState.getCount() === 0 || !getCurrentPlaylistId();
 
   var spinner = overlay.querySelector('#yt-bulk-spinner');
   if (spinner) {

@@ -65,7 +65,7 @@ async function dispatchRemove(session, playlistId, entries) {
   }
 
   Logger.info(
-    'Dispatching remove for ' + entries.length + ' video(s) from playlist ' + playlistId
+    'Dispatching remove for ' + entries.length + ' ' + pluralize(entries.length, 'video') + ' from playlist ' + playlistId
   );
 
   for (var i = 0; i < entries.length; i++) {
@@ -117,7 +117,7 @@ async function dispatchRemove(session, playlistId, entries) {
     }
   }
 
-  Logger.success('All ' + entries.length + ' video(s) removed from playlist ' + playlistId);
+  Logger.success('All ' + entries.length + ' ' + pluralize(entries.length, 'video') + ' removed from playlist ' + playlistId);
 
   return { count: entries.length };
 }
@@ -183,7 +183,7 @@ async function dispatchActions(session, playlistId, videoIds, actionType) {
     }
   }
 
-  Logger.success('All ' + videoIds.length + ' video(s) added to playlist ' + playlistId);
+  Logger.success('All ' + videoIds.length + ' ' + pluralize(videoIds.length, 'video') + ' added to playlist ' + playlistId);
 
   return { count: videoIds.length };
 }

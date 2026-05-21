@@ -35,9 +35,12 @@ function _injectBatch(nodes) {
 
 function startObserver() {
   var rendererSelector = CONFIG.VIDEO_RENDERER;
+  var observeTarget = _findPlaylistContentsRoot() || document.body;
 
-  var existing = document.querySelectorAll(rendererSelector);
-  Logger.info('Initial pass: found ' + existing.length + ' existing video renderer(s)');
+  // Only inject checkboxes for renderers inside the actual playlist contents,
+  // not in recommended/suggested video sections at the bottom of the page
+  var existing = observeTarget.querySelectorAll(rendererSelector);
+  Logger.info('Initial pass: found ' + existing.length + ' existing video renderer(s) in playlist');
   for (var i = 0; i < existing.length; i++) {
     try {
       injectCheckbox(existing[i]);
@@ -45,8 +48,6 @@ function startObserver() {
       Logger.error('Initial pass inject failed:', e.message);
     }
   }
-
-  var observeTarget = _findPlaylistContentsRoot() || document.body;
   Logger.info('MutationObserver scoped to:', observeTarget === document.body ? 'document.body (fallback)' : observeTarget.tagName + '#' + (observeTarget.id || '(no-id)'));
 
   var _pendingNodes = [];

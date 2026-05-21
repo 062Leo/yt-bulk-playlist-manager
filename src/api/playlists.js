@@ -179,12 +179,20 @@ async function fetchPlaylistSetVideoIds(session, playlistId, targetVideoIds, max
     var contents = null;
     try {
       if (continuationToken) {
-        contents = (data.onResponseReceivedActions &&
-                    data.onResponseReceivedActions[0] &&
-                    data.onResponseReceivedActions[0].appendContinuationItemsAction &&
-                    data.onResponseReceivedActions[0].appendContinuationItemsAction.continuationItems);
+        var ra = data.onResponseReceivedActions;
+        if (ra && ra[0] && ra[0].appendContinuationItemsAction) {
+          contents = ra[0].appendContinuationItemsAction.continuationItems;
+        } else if (data.continuationContents && data.continuationContents.playlistVideoListContinuation) {
+          contents = data.continuationContents.playlistVideoListContinuation.contents;
+        } else {
+          Logger.debug('fetchPlaylistSetVideoIds: unknown continuation response format');
+        }
       } else {
         var topContents = data.contents;
+        if (!topContents) {
+          Logger.warn('fetchPlaylistSetVideoIds: no contents in response for playlist', playlistId);
+          break;
+        }
 
         function deepFind(obj, targetKey) {
           if (!obj || typeof obj !== 'object') return null;
@@ -198,7 +206,35 @@ async function fetchPlaylistSetVideoIds(session, playlistId, targetVideoIds, max
         }
 
         var pvl = deepFind(topContents, 'playlistVideoListRenderer');
-        var contents = pvl && pvl.contents;
+        if (pvl && pvl.contents) {
+          contents = pvl.contents;
+        } else {
+          var rgr = deepFind(topContents, 'richGridRenderer');
+          if (rgr && rgr.contents) {
+            contents = rgr.contents;
+          } else {
+            var slr = deepFind(topContents, 'sectionListRenderer');
+            if (slr && slr.contents) {
+              for (var s = 0; s < slr.contents.length; s++) {
+                var sub = slr.contents[s];
+                if (sub.playlistVideoListRenderer && sub.playlistVideoListRenderer.contents) {
+                  contents = sub.playlistVideoListRenderer.contents;
+                  break;
+                }
+                if (sub.richItemRenderer && sub.richItemRenderer.content &&
+                    sub.richItemRenderer.content.playlistVideoRenderer) {
+                  contents = slr.contents;
+                  break;
+                }
+              }
+            }
+          }
+        }
+
+        if (!contents) {
+          Logger.warn('fetchPlaylistSetVideoIds: no known renderer structure found in response');
+          break;
+        }
       }
     } catch (e) {
       Logger.warn('Failed to parse playlist contents:', e.message);
@@ -215,9 +251,15 @@ async function fetchPlaylistSetVideoIds(session, playlistId, targetVideoIds, max
     for (var c = 0; c < contents.length; c++) {
       var item = contents[c];
       if (item.continuationItemRenderer) {
-        continuationToken = item.continuationItemRenderer.continuationEndpoint &&
-                            item.continuationItemRenderer.continuationEndpoint.continuationCommand &&
-                            item.continuationItemRenderer.continuationEndpoint.continuationCommand.token;
+        var contEp = item.continuationItemRenderer.continuationEndpoint;
+        if (contEp && contEp.continuationCommand) {
+          continuationToken = contEp.continuationCommand.token;
+        } else if (contEp && contEp.command && contEp.command.continuationCommand) {
+          continuationToken = contEp.command.continuationCommand.token;
+        } else if (item.continuationItemRenderer.button && item.continuationItemRenderer.button.command &&
+                   item.continuationItemRenderer.button.command.continuationCommand) {
+          continuationToken = item.continuationItemRenderer.button.command.continuationCommand.token;
+        }
         continue;
       }
 
@@ -232,15 +274,24 @@ async function fetchPlaylistSetVideoIds(session, playlistId, targetVideoIds, max
       }
 
       if (!renderer) {
-        var lockupVm = item.richItemRenderer &&
-                       item.richItemRenderer.content &&
-                       item.richItemRenderer.content.lockupViewModel;
-        if (lockupVm && lockupVm.contentId && targetSet[lockupVm.contentId]) {
-          var lockupSetVideoId = lockupVm.setVideoId || lockupVm.playlistSetVideoId;
-          if (lockupSetVideoId) {
-            videoIdToSetId[lockupVm.contentId] = lockupSetVideoId;
-            remaining--;
-            if (remaining === 0) break;
+        var ric = item.richItemRenderer && item.richItemRenderer.content;
+        if (ric) {
+          if (ric.playlistVideoRenderer && ric.playlistVideoRenderer.videoId && targetSet[ric.playlistVideoRenderer.videoId]) {
+            var setVideoId = ric.playlistVideoRenderer.setVideoId;
+            if (setVideoId) {
+              videoIdToSetId[ric.playlistVideoRenderer.videoId] = setVideoId;
+              remaining--;
+              if (remaining === 0) break;
+            }
+          }
+          var lockupVm = ric.lockupViewModel;
+          if (lockupVm && lockupVm.contentId && targetSet[lockupVm.contentId]) {
+            var lockupSetVideoId = lockupVm.setVideoId || lockupVm.playlistSetVideoId;
+            if (lockupSetVideoId) {
+              videoIdToSetId[lockupVm.contentId] = lockupSetVideoId;
+              remaining--;
+              if (remaining === 0) break;
+            }
           }
         }
       }
@@ -288,40 +339,80 @@ async function fetchPlaylistVideoIds(session, playlistId, targetIds, maxPages) {
         body: JSON.stringify(body)
       });
     } catch (e) {
-      Logger.warn('Failed to fetch playlist contents for duplicate check:', e.message);
+      Logger.warn('fetchPlaylistVideoIds: fetch failed:', e.message);
       break;
     }
 
-    if (!res.ok) break;
+    if (!res.ok) {
+      Logger.warn('fetchPlaylistVideoIds: HTTP', res.status, 'for playlist', playlistId);
+      break;
+    }
 
     var data = await res.json();
 
     var contents = null;
     try {
       if (continuationToken) {
-        contents = (data.onResponseReceivedActions &&
-                    data.onResponseReceivedActions[0] &&
-                    data.onResponseReceivedActions[0].appendContinuationItemsAction &&
-                    data.onResponseReceivedActions[0].appendContinuationItemsAction.continuationItems);
+        var ra = data.onResponseReceivedActions;
+        if (ra && ra[0] && ra[0].appendContinuationItemsAction) {
+          contents = ra[0].appendContinuationItemsAction.continuationItems;
+        } else if (data.continuationContents && data.continuationContents.playlistVideoListContinuation) {
+          contents = data.continuationContents.playlistVideoListContinuation.contents;
+        } else {
+          Logger.debug('fetchPlaylistVideoIds: unknown continuation response format');
+        }
       } else {
         var topContents = data.contents;
+        if (!topContents) {
+          Logger.warn('fetchPlaylistVideoIds: no contents in response for playlist', playlistId);
+          break;
+        }
 
-        function deepFind2(obj, targetKey) {
+        function deepFind3(obj, targetKey) {
           if (!obj || typeof obj !== 'object') return null;
           if (obj[targetKey]) return obj[targetKey];
           for (var key in obj) {
             if (!obj.hasOwnProperty(key)) continue;
-            var found = deepFind2(obj[key], targetKey);
+            var found = deepFind3(obj[key], targetKey);
             if (found) return found;
           }
           return null;
         }
 
-        var pvl2 = deepFind2(topContents, 'playlistVideoListRenderer');
-        var contents = pvl2 && pvl2.contents;
+        var pvl = deepFind3(topContents, 'playlistVideoListRenderer');
+        if (pvl && pvl.contents) {
+          contents = pvl.contents;
+        } else {
+          // YouTube may use various response structures
+          var rgr = deepFind3(topContents, 'richGridRenderer');
+          if (rgr && rgr.contents) {
+            contents = rgr.contents;
+          } else {
+            var slr = deepFind3(topContents, 'sectionListRenderer');
+            if (slr && slr.contents) {
+              for (var s = 0; s < slr.contents.length; s++) {
+                var sub = slr.contents[s];
+                if (sub.playlistVideoListRenderer && sub.playlistVideoListRenderer.contents) {
+                  contents = sub.playlistVideoListRenderer.contents;
+                  break;
+                }
+                if (sub.richItemRenderer && sub.richItemRenderer.content &&
+                    sub.richItemRenderer.content.playlistVideoRenderer) {
+                  contents = slr.contents;
+                  break;
+                }
+              }
+            }
+          }
+        }
+
+        if (!contents) {
+          Logger.warn('fetchPlaylistVideoIds: no known renderer structure found in response');
+          break;
+        }
       }
     } catch (e) {
-      Logger.warn('Failed to parse playlist contents:', e.message);
+      Logger.warn('fetchPlaylistVideoIds: parse error:', e.message);
       break;
     }
 
@@ -330,17 +421,31 @@ async function fetchPlaylistVideoIds(session, playlistId, targetIds, maxPages) {
     for (var c = 0; c < contents.length; c++) {
       var item = contents[c];
       if (item.continuationItemRenderer) {
-        continuationToken = item.continuationItemRenderer.continuationEndpoint &&
-                            item.continuationItemRenderer.continuationEndpoint.continuationCommand &&
-                            item.continuationItemRenderer.continuationEndpoint.continuationCommand.token;
+        var contEp = item.continuationItemRenderer.continuationEndpoint;
+        if (contEp && contEp.continuationCommand) {
+          continuationToken = contEp.continuationCommand.token;
+        } else if (contEp && contEp.command && contEp.command.continuationCommand) {
+          continuationToken = contEp.command.continuationCommand.token;
+        } else if (item.continuationItemRenderer.button && item.continuationItemRenderer.button.command &&
+                   item.continuationItemRenderer.button.command.continuationCommand) {
+          continuationToken = item.continuationItemRenderer.button.command.continuationCommand.token;
+        }
         continue;
       }
 
-      var videoId = (item.playlistVideoRenderer && item.playlistVideoRenderer.videoId) ||
-                    (item.richItemRenderer &&
-                     item.richItemRenderer.content &&
-                     item.richItemRenderer.content.lockupViewModel &&
-                     item.richItemRenderer.content.lockupViewModel.contentId);
+      var videoId = null;
+      if (item.playlistVideoRenderer) {
+        videoId = item.playlistVideoRenderer.videoId;
+      } else if (item.richItemRenderer && item.richItemRenderer.content) {
+        var ric = item.richItemRenderer.content;
+        if (ric.playlistVideoRenderer) {
+          videoId = ric.playlistVideoRenderer.videoId;
+        } else if (ric.lockupViewModel) {
+          videoId = ric.lockupViewModel.contentId;
+        }
+      } else if (item.lockupViewModel) {
+        videoId = item.lockupViewModel.contentId;
+      }
 
       if (videoId && targetSet[videoId]) {
         foundIds.push(videoId);
@@ -352,5 +457,6 @@ async function fetchPlaylistVideoIds(session, playlistId, targetIds, maxPages) {
     if (!continuationToken) break;
   }
 
+  Logger.debug('fetchPlaylistVideoIds found', foundIds.length, 'of', targetIds.length, 'target ' + pluralize(targetIds.length, 'video') + ' in playlist', playlistId);
   return foundIds;
 }
