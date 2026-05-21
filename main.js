@@ -160,9 +160,26 @@ function wireButtons() {
           await dispatchBatch(_session, playlistId, newIds);
         }
 
-        // Step 2: Remove ALL selected from current playlist (only after successful add)
+        // Step 2: Remove all selected from current playlist
+        // Fetch the correct setVideoIds for the current playlist
+        var videoIdToSetId = await fetchPlaylistSetVideoIds(_session, currentPlaylistId, videoIds);
+        var videoPayloads = [];
+        for (var vi = 0; vi < videoIds.length; vi++) {
+          var vid = videoIds[vi];
+          var setVideoId = videoIdToSetId[vid] || null;
+          if (!setVideoId) {
+            Logger.warn('No setVideoId found for', vid, 'in current playlist', currentPlaylistId);
+          }
+          videoPayloads.push({
+            videoId: vid,
+            setVideoId: setVideoId
+          });
+        }
+
+        var removed = false;
         try {
-          await dispatchRemove(_session, currentPlaylistId, videoIds);
+          var result = await dispatchRemove(_session, currentPlaylistId, videoPayloads);
+          removed = result.count > 0;
         } catch (removeErr) {
           setOverlayError('Added to target but failed to remove from current: ' + removeErr.message);
           selectionState.clear();
@@ -170,7 +187,20 @@ function wireButtons() {
           return;
         }
 
-        setOverlaySuccess('Moved ' + videoIds.length + ' video(s)!');
+        if (removed) {
+          for (var ri = 0; ri < videoIds.length; ri++) {
+            var allCbs = document.querySelectorAll(
+              '.' + CONFIG.MANAGED_CLASS + ' input[type="checkbox"][data-video-id="' + videoIds[ri] + '"]'
+            );
+            for (var rj = 0; rj < allCbs.length; rj++) {
+              var renderer = allCbs[rj].closest(CONFIG.VIDEO_RENDERER);
+              if (renderer) renderer.remove();
+            }
+          }
+          setOverlaySuccess('Moved ' + videoIds.length + ' video(s)!');
+        } else {
+          setOverlayWarning('Added ' + videoIds.length + ' video(s) but could not remove from current playlist');
+        }
         selectionState.clear();
         uncheckAll();
       } catch (err) {

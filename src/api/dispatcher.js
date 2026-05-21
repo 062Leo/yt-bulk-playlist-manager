@@ -56,8 +56,70 @@ async function dispatchBatch(session, playlistId, videoIds) {
   return dispatchActions(session, playlistId, videoIds, 'add');
 }
 
-async function dispatchRemove(session, playlistId, videoIds) {
-  return dispatchActions(session, playlistId, videoIds, 'remove');
+async function dispatchRemove(session, playlistId, entries) {
+  // entries: [{videoId: "...", setVideoId: "..."}]
+  // Sends ACTION_REMOVE_VIDEO with the playlist-specific setVideoId
+  if (!Array.isArray(entries) || entries.length === 0) {
+    Logger.error('dispatchRemove: entries must be a non-empty array');
+    throw new Error('entries must be a non-empty array');
+  }
+
+  Logger.info(
+    'Dispatching remove for ' + entries.length + ' video(s) from playlist ' + playlistId
+  );
+
+  for (var i = 0; i < entries.length; i++) {
+    var entry = entries[i];
+
+    if (!entry.setVideoId) {
+      Logger.warn('Skipping video', entry.videoId, '— no setVideoId available for this playlist');
+      continue;
+    }
+
+    var payload = {
+      context: session.context,
+      playlistId: playlistId,
+      actions: [
+        { action: 'ACTION_REMOVE_VIDEO', removedVideoId: entry.videoId, setVideoId: entry.setVideoId }
+      ]
+    };
+
+    var endpoint = CONFIG.EDIT_PLAYLIST_ENDPOINT + '?key=' + session.apiKey;
+
+    var headers = { 'Content-Type': 'application/json' };
+    if (session.authHeaders) {
+      Object.assign(headers, session.authHeaders);
+    }
+
+    try {
+      await fetchWithRetry(
+        endpoint,
+        {
+          method: 'POST',
+          credentials: 'include',
+          headers: headers,
+          body: JSON.stringify(payload)
+        }
+      );
+    } catch (err) {
+      Logger.error(
+        'Video ' + (i + 1) + ' failed' +
+        (err.status ? ' (HTTP ' + err.status + ')' : '') +
+        ': ' + err.message
+      );
+      throw err;
+    }
+
+    Logger.success('Video ' + (i + 1) + '/' + entries.length + ' removed');
+
+    if (i < entries.length - 1) {
+      await sleep(CONFIG.CHUNK_DELAY_MS);
+    }
+  }
+
+  Logger.success('All ' + entries.length + ' video(s) removed from playlist ' + playlistId);
+
+  return { count: entries.length };
 }
 
 async function dispatchActions(session, playlistId, videoIds, actionType) {
@@ -72,17 +134,13 @@ async function dispatchActions(session, playlistId, videoIds, actionType) {
   }
 
   var chunks = chunkArray(videoIds, CONFIG.BATCH_CHUNK_SIZE);
-  var label = actionType === 'remove' ? 'remove from' : 'add to';
 
   Logger.info(
-    'Dispatching ' + videoIds.length + ' videos to ' + label + ' playlist ' + playlistId + ' in ' + chunks.length + ' chunk(s)'
+    'Dispatching ' + videoIds.length + ' videos to add to playlist ' + playlistId + ' in ' + chunks.length + ' chunk(s)'
   );
 
   for (var i = 0; i < chunks.length; i++) {
     var actions = chunks[i].map(function (id) {
-      if (actionType === 'remove') {
-        return { action: 'ACTION_REMOVE_VIDEO', removedVideoId: id };
-      }
       return { action: 'ACTION_ADD_VIDEO', addedVideoId: id };
     });
 
@@ -125,7 +183,7 @@ async function dispatchActions(session, playlistId, videoIds, actionType) {
     }
   }
 
-  Logger.success('All ' + videoIds.length + ' video(s) ' + (actionType === 'remove' ? 'removed from' : 'added to') + ' playlist ' + playlistId);
+  Logger.success('All ' + videoIds.length + ' video(s) added to playlist ' + playlistId);
 
   return { count: videoIds.length };
 }

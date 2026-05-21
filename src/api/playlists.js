@@ -129,6 +129,131 @@ async function fetchUserPlaylists(session) {
   return playlists;
 }
 
+async function fetchPlaylistSetVideoIds(session, playlistId, targetVideoIds, maxPages) {
+  if (maxPages === undefined) maxPages = 10;
+
+  var endpoint = CONFIG.BROWSE_ENDPOINT + '?key=' + session.apiKey;
+  var browseId = 'VL' + playlistId;
+  var videoIdToSetId = {};
+  var targetSet = {};
+  for (var i = 0; i < targetVideoIds.length; i++) {
+    targetSet[targetVideoIds[i]] = true;
+  }
+  var remaining = targetVideoIds.length;
+
+  var headers = { 'Content-Type': 'application/json' };
+  if (session.authHeaders) {
+    Object.assign(headers, session.authHeaders);
+  }
+
+  var continuationToken = null;
+
+  for (var page = 0; page < maxPages && remaining > 0; page++) {
+    var body = { context: session.context, browseId: browseId };
+    if (continuationToken) {
+      body = { context: session.context, continuation: continuationToken };
+    }
+
+    var res;
+    try {
+      res = await fetch(endpoint, {
+        method: 'POST',
+        credentials: 'include',
+        headers: headers,
+        body: JSON.stringify(body)
+      });
+    } catch (e) {
+      Logger.warn('Failed to fetch playlist contents for setVideoId lookup:', e.message);
+      break;
+    }
+
+    if (!res.ok) {
+      Logger.warn('fetchPlaylistSetVideoIds: HTTP', res.status, 'for page', page);
+      break;
+    }
+
+    var data = await res.json();
+
+    Logger.debug('fetchPlaylistSetVideoIds page', page, 'response keys:', Object.keys(data).join(', '));
+
+    var contents = null;
+    try {
+      if (continuationToken) {
+        contents = (data.onResponseReceivedActions &&
+                    data.onResponseReceivedActions[0] &&
+                    data.onResponseReceivedActions[0].appendContinuationItemsAction &&
+                    data.onResponseReceivedActions[0].appendContinuationItemsAction.continuationItems);
+      } else {
+        var topContents = data.contents;
+
+        function deepFind(obj, targetKey) {
+          if (!obj || typeof obj !== 'object') return null;
+          if (obj[targetKey]) return obj[targetKey];
+          for (var key in obj) {
+            if (!obj.hasOwnProperty(key)) continue;
+            var found = deepFind(obj[key], targetKey);
+            if (found) return found;
+          }
+          return null;
+        }
+
+        var pvl = deepFind(topContents, 'playlistVideoListRenderer');
+        var contents = pvl && pvl.contents;
+      }
+    } catch (e) {
+      Logger.warn('Failed to parse playlist contents:', e.message);
+      break;
+    }
+
+    if (!contents) {
+      Logger.warn('fetchPlaylistSetVideoIds: no contents found on page', page);
+      break;
+    }
+
+    Logger.debug('fetchPlaylistSetVideoIds: found', contents.length, 'items on page', page);
+
+    for (var c = 0; c < contents.length; c++) {
+      var item = contents[c];
+      if (item.continuationItemRenderer) {
+        continuationToken = item.continuationItemRenderer.continuationEndpoint &&
+                            item.continuationItemRenderer.continuationEndpoint.continuationCommand &&
+                            item.continuationItemRenderer.continuationEndpoint.continuationCommand.token;
+        continue;
+      }
+
+      var renderer = item.playlistVideoRenderer;
+      if (renderer && renderer.videoId && targetSet[renderer.videoId]) {
+        var setVideoId = renderer.setVideoId;
+        if (setVideoId) {
+          videoIdToSetId[renderer.videoId] = setVideoId;
+          remaining--;
+          if (remaining === 0) break;
+        }
+      }
+
+      if (!renderer) {
+        var lockupVm = item.richItemRenderer &&
+                       item.richItemRenderer.content &&
+                       item.richItemRenderer.content.lockupViewModel;
+        if (lockupVm && lockupVm.contentId && targetSet[lockupVm.contentId]) {
+          var lockupSetVideoId = lockupVm.setVideoId || lockupVm.playlistSetVideoId;
+          if (lockupSetVideoId) {
+            videoIdToSetId[lockupVm.contentId] = lockupSetVideoId;
+            remaining--;
+            if (remaining === 0) break;
+          }
+        }
+      }
+    }
+
+    if (!continuationToken) break;
+  }
+
+  Logger.debug('fetchPlaylistSetVideoIds result:', JSON.stringify(videoIdToSetId));
+
+  return videoIdToSetId;
+}
+
 async function fetchPlaylistVideoIds(session, playlistId, targetIds, maxPages) {
   if (maxPages === undefined) maxPages = 10;
 
@@ -171,7 +296,6 @@ async function fetchPlaylistVideoIds(session, playlistId, targetIds, maxPages) {
 
     var data = await res.json();
 
-    // Extract video IDs from playlist contents
     var contents = null;
     try {
       if (continuationToken) {
@@ -180,27 +304,21 @@ async function fetchPlaylistVideoIds(session, playlistId, targetIds, maxPages) {
                     data.onResponseReceivedActions[0].appendContinuationItemsAction &&
                     data.onResponseReceivedActions[0].appendContinuationItemsAction.continuationItems);
       } else {
-        var tabs = data.contents && data.contents.twoColumnBrowseResultsRenderer &&
-                   data.contents.twoColumnBrowseResultsRenderer.tabs;
-        if (tabs) {
-          for (var t = 0; t < tabs.length; t++) {
-            var tc = tabs[t].tabRenderer && tabs[t].tabRenderer.content;
-            if (!tc) continue;
-            var playlistVideoList = tc.sectionListRenderer &&
-                                    tc.sectionListRenderer.contents &&
-                                    tc.sectionListRenderer.contents[0] &&
-                                    tc.sectionListRenderer.contents[0].playlistVideoListRenderer;
-            if (playlistVideoList) {
-              contents = playlistVideoList.contents;
-              break;
-            }
-            var richGrid = tc.richGridRenderer;
-            if (richGrid) {
-              contents = richGrid.contents;
-              break;
-            }
+        var topContents = data.contents;
+
+        function deepFind2(obj, targetKey) {
+          if (!obj || typeof obj !== 'object') return null;
+          if (obj[targetKey]) return obj[targetKey];
+          for (var key in obj) {
+            if (!obj.hasOwnProperty(key)) continue;
+            var found = deepFind2(obj[key], targetKey);
+            if (found) return found;
           }
+          return null;
         }
+
+        var pvl2 = deepFind2(topContents, 'playlistVideoListRenderer');
+        var contents = pvl2 && pvl2.contents;
       }
     } catch (e) {
       Logger.warn('Failed to parse playlist contents:', e.message);

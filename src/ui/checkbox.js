@@ -1,5 +1,16 @@
 // checkbox.js – Injects checkboxes into ytd-playlist-video-renderer rows with videoId extraction
 
+function findPlaylistEditEndpoint(obj) {
+  if (!obj || typeof obj !== 'object') return null;
+  if (obj.playlistEditEndpoint) return obj.playlistEditEndpoint;
+  for (var key in obj) {
+    if (!obj.hasOwnProperty(key)) continue;
+    var found = findPlaylistEditEndpoint(obj[key]);
+    if (found) return found;
+  }
+  return null;
+}
+
 function injectCheckbox(rendererElement) {
   try {
     if (rendererElement.classList.contains(CONFIG.MANAGED_CLASS)) {
@@ -31,9 +42,25 @@ function injectCheckbox(rendererElement) {
       return;
     }
 
+    // Store YouTube's own playlist edit endpoint data for later removal
+    var editEndpointData = null;
+    if (rendererElement.data) {
+      editEndpointData = findPlaylistEditEndpoint(rendererElement.data);
+      if (editEndpointData) {
+        Logger.debug('Extracted playlistEditEndpoint for', videoId);
+      } else {
+        Logger.warn('No playlistEditEndpoint found in renderer data for', videoId);
+      }
+    } else {
+      Logger.warn('rendererElement.data not available for', videoId);
+    }
+
     var checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
     checkbox.setAttribute('data-video-id', videoId);
+    if (editEndpointData) {
+      checkbox.setAttribute('data-playlist-edit', JSON.stringify(editEndpointData));
+    }
     checkbox.style.cssText = [
       'width:18px',
       'height:18px',
