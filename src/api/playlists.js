@@ -11,30 +11,25 @@ function _deepFind(obj, targetKey) {
   return null;
 }
 
-async function fetchUserPlaylists(session) {
-  var endpoint = CONFIG.BROWSE_ENDPOINT + '?key=' + session.apiKey;
-  var browseId = 'FEplaylist_aggregation';
+function _continuationToken(renderer) {
+  var ep = renderer.continuationEndpoint;
+  if (ep && ep.continuationCommand) return ep.continuationCommand.token;
+  if (ep && ep.command && ep.command.continuationCommand)
+    return ep.command.continuationCommand.token;
+  var btn = renderer.button && renderer.button.command;
+  if (btn && btn.continuationCommand) return btn.continuationCommand.token;
+  return null;
+}
 
-  // Logger.info('Fetching user playlists...');
-
-  var headers = await getRequestHeaders(session);
-
-  var res = await fetch(endpoint, {
-    method: 'POST',
-    credentials: 'include',
-    headers: headers,
-    body: JSON.stringify({
-      context: session.context,
-      browseId: browseId,
-    }),
-  });
-
-  if (!res.ok) {
-    throw ApiError.fromResponse(res);
+function _addPlaylist(playlists, entry) {
+  for (var k = 0; k < playlists.length; k++) {
+    if (playlists[k].playlistId === entry.playlistId) return;
   }
+  playlists.push(entry);
+}
 
-  var data = await res.json();
-
+// Finds the playlist item list in the first FEplaylist_aggregation page. Throws ParseError.
+function _extractUserPlaylistItems(data) {
   var items;
   try {
     if (data.contents && data.contents.twoColumnBrowseResultsRenderer) {
@@ -93,10 +88,20 @@ async function fetchUserPlaylists(session) {
     );
   }
 
-  var playlists = [];
+  return items;
+}
+
+// Appends parsed playlists from one page of items; returns the next continuation token or null.
+function _parseUserPlaylistItems(items, playlists) {
+  var token = null;
 
   for (var i = 0; i < items.length; i++) {
     var item = items[i];
+
+    if (item.continuationItemRenderer) {
+      token = _continuationToken(item.continuationItemRenderer) || token;
+      continue;
+    }
 
     if (item.richItemRenderer) {
       item = item.richItemRenderer.content;
@@ -111,7 +116,7 @@ async function fetchUserPlaylists(session) {
         vm.metadata.lockupMetadataViewModel.title &&
         vm.metadata.lockupMetadataViewModel.title.content;
       if (plId && title) {
-        playlists.push({ playlistId: plId, title: title });
+        _addPlaylist(playlists, { playlistId: plId, title: title });
       }
       continue;
     }
@@ -123,7 +128,7 @@ async function fetchUserPlaylists(session) {
         var subItem = item.gridRenderer.items[j];
         var subRenderer = subItem.gridPlaylistRenderer || subItem.playlistRenderer;
         if (subRenderer && subRenderer.playlistId && subRenderer.title && subRenderer.title.runs) {
-          playlists.push({
+          _addPlaylist(playlists, {
             playlistId: subRenderer.playlistId,
             title: subRenderer.title.runs[0].text,
           });
@@ -139,14 +144,73 @@ async function fetchUserPlaylists(session) {
       renderer.title.runs &&
       renderer.title.runs.length > 0
     ) {
-      playlists.push({
+      _addPlaylist(playlists, {
         playlistId: renderer.playlistId,
         title: renderer.title.runs[0].text,
       });
     }
   }
 
-  // Logger.success('Fetched', playlists.length, 'playlist(s)');
+  return token;
+}
+
+async function fetchUserPlaylists(session, maxPages) {
+  if (maxPages === undefined) maxPages = CONFIG.USER_PLAYLISTS_MAX_PAGES;
+  var endpoint = CONFIG.BROWSE_ENDPOINT + '?key=' + session.apiKey;
+  var browseId = 'FEplaylist_aggregation';
+
+  var headers = await getRequestHeaders(session);
+  var playlists = [];
+  var continuationToken = null;
+
+  for (var page = 0; page < maxPages; page++) {
+    var body = { context: session.context, browseId: browseId };
+    if (continuationToken) {
+      body = { context: session.context, continuation: continuationToken };
+    }
+
+    var res;
+    try {
+      res = await fetch(endpoint, {
+        method: 'POST',
+        credentials: 'include',
+        headers: headers,
+        body: JSON.stringify(body),
+      });
+    } catch (e) {
+      // The first page must succeed; later pages only extend the list.
+      if (page === 0) throw e;
+      Logger.warn('fetchUserPlaylists: page', page, 'failed:', e.message);
+      break;
+    }
+
+    if (!res.ok) {
+      if (page === 0) throw ApiError.fromResponse(res);
+      Logger.warn('fetchUserPlaylists: HTTP', res.status, 'for page', page);
+      break;
+    }
+
+    var data = await res.json();
+
+    var items;
+    if (page === 0) {
+      items = _extractUserPlaylistItems(data);
+    } else {
+      var ra = data.onResponseReceivedActions;
+      items =
+        ra && ra[0] && ra[0].appendContinuationItemsAction
+          ? ra[0].appendContinuationItemsAction.continuationItems
+          : null;
+      if (!items) {
+        Logger.warn('fetchUserPlaylists: unknown continuation response format');
+        break;
+      }
+    }
+
+    continuationToken = _parseUserPlaylistItems(items, playlists);
+    if (!continuationToken) break;
+  }
+
   return playlists;
 }
 
