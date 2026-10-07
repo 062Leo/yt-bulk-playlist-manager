@@ -18,12 +18,12 @@ A Tampermonkey/Violentmonkey userscript that adds multi-select checkboxes to You
 
 SongVoyage opens `https://www.youtube.com/feed/playlists#sv-import=<payload>`.
 
-| Item        | Contract                                                                                               |
-| ----------- | ------------------------------------------------------------------------------------------------------ |
-| `<payload>` | base64url (RFC 4648 §5, no padding) of UTF-8 JSON `{"v":1,"title":"…","ids":["<11-char id>", …]}`      |
-| ids         | Must match `/^[A-Za-z0-9_-]{11}$/`; invalid ones dropped, duplicates removed (order kept), up to ~5000 |
-| Unknown `v` | Dialog "Update the userscript"                                                                         |
-| Hash        | Removed right away (`history.replaceState`), so a reload does not import again                         |
+| Item        | Contract                                                                                                                                 |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `<payload>` | base64url (RFC 4648 §5, no padding) of UTF-8 JSON `{"v":1,"title":"…","ids":["<11-char id>", …]}`                                        |
+| ids         | Must match `/^[A-Za-z0-9_-]{11}$/`; invalid ones dropped, duplicates removed (order kept), up to ~5000                                   |
+| Unknown `v` | Dialog "Update the userscript"                                                                                                           |
+| Hash        | Captured and removed at `document-start` (`history.replaceState`), before YouTube can rewrite the URL, so a reload does not import again |
 
 Flow: dialog "Import N songs from SongVoyage" → **Create new playlist** (name prefilled, Private / Unlisted / Public) or **Add to existing playlist** (shows "X already in playlist, will be skipped") → progress → "Added N, skipped M (duplicates), failed K" with an _Open playlist_ link.
 

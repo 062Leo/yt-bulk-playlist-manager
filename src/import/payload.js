@@ -101,6 +101,18 @@ function readImportHash(hash) {
   return body.slice(prefix.length);
 }
 
+/**
+ * Reads #sv-import= synchronously and strips it from the URL right away.
+ * Called at document-start, before YouTube can rewrite the URL.
+ * Returns the raw payload or null.
+ */
+function captureImportHash(win) {
+  win = win || window;
+  var raw = readImportHash(win.location.hash);
+  if (raw !== null) stripImportHash(win);
+  return raw;
+}
+
 /** Removes the hash from the URL without navigating, keeping YouTube's history state. */
 function stripImportHash(win) {
   win = win || window;

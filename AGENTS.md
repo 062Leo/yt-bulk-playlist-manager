@@ -65,6 +65,15 @@ The project lives on Windows (`C:\...`) but development happens from WSL. Two im
 - YouTube is a SPA. Watch for `yt-navigate-finish` to re-init on virtual navigation.
 - `window.ytcfg` may not exist at script start — always poll (see `session.js`).
 
+## Startup (`@run-at document-start`)
+
+| Step | When |
+| --- | --- |
+| `captureImportHash()` reads + strips `#sv-import=` | synchronously at script start (`main.js` top) |
+| `init()`, `checkSongVoyageImport(captured)` and all DOM work | `whenDomReady()` (DOMContentLoaded or already parsed) |
+
+Never touch `document.body`/`head` at top level; go through `whenDomReady`.
+
 ## Logging
 
 Filter DevTools console by `[YT-BULK]` to see only script output. Five log levels: `Logger.info()`, `.success()`, `.warn()`, `.error()`, `.debug()`. Use `logGroup(label, fn)` for grouped log output.

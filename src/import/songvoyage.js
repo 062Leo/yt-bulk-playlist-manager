@@ -75,13 +75,12 @@ function _importErrorTitle(parsed) {
 /**
  * Checks location.hash for a SongVoyage payload and runs the import.
  * Safe to call repeatedly (initial load, yt-navigate-finish, hashchange).
+ * captured: payload already taken from the URL at document-start (optional).
  */
-async function checkSongVoyageImport() {
-  var raw = readImportHash(window.location.hash);
+async function checkSongVoyageImport(captured) {
+  // Event listeners pass an Event; only a string is a payload captured at script start.
+  var raw = typeof captured === 'string' ? captured : captureImportHash(window);
   if (raw === null) return;
-
-  // Remove first, so a reload or a second event does not import again.
-  stripImportHash(window);
 
   if (_importRunning) {
     Logger.warn('SongVoyage import already running – ignoring second link');

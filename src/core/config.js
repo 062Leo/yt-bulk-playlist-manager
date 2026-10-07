@@ -47,6 +47,19 @@ const CONFIG = Object.freeze({
   IMPORT_CREATE_BATCH_SIZE: 10,
 });
 
+/**
+ * Runs fn once the DOM is parsed. The script runs at document-start, so
+ * anything that touches document.body/head must go through this.
+ */
+function whenDomReady(fn, doc) {
+  doc = doc || document;
+  if (doc.readyState === 'loading') {
+    doc.addEventListener('DOMContentLoaded', fn, { once: true });
+  } else {
+    fn();
+  }
+}
+
 function pluralize(count, singular, plural) {
   return count === 1 ? singular : plural || singular + 's';
 }
