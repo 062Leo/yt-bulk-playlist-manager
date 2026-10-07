@@ -1,0 +1,28 @@
+{
+  "name": "yt-bulk-playlist-manager",
+  "version": "1.1.0",
+  "private": true,
+  "description": "Tampermonkey userscript: bulk copy/move/remove YouTube playlist videos and import SongVoyage playlists.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "npm run lint && npm run format:check && npm test && npm run build && node --check dist/yt-bulk-playlist-manager.user.js"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.12.0",
+    "globals": "^17.13.0",
+    "jsdom": "^30.1.2",
+    "prettier": "^3.9.9",
+    "vitest": "^5.0.3"
+  }
+}

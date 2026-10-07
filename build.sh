@@ -1,58 +1,10 @@
 #!/bin/bash
-# Build script for YT Bulk Playlist Manager
-# Concatenates all source modules into a single standalone .user.js file
-# for direct installation in Tampermonkey / Violentmonkey.
+# Build script for YT Bulk Playlist Manager.
+# Thin wrapper around scripts/build.mjs (Node >= 20), which concatenates all
+# @require'd sources (order from loader.user.js) into one standalone file.
 #
-# Usage:  ./build.sh
+# Usage:  ./build.sh        (same as: npm run build)
 # Output: dist/yt-bulk-playlist-manager.user.js
-
 set -euo pipefail
-
-SRC="src"
-DIST="dist"
-OUT="$DIST/yt-bulk-playlist-manager.user.js"
-HEADER="loader.user.js"
-
-mkdir -p "$DIST"
-
-# ─── Write standalone userscript header ───────────────────────────────────────
-cat > "$OUT" << 'HEADER'
-// ==UserScript==
-// @name         YT Bulk Playlist Manager
-// @namespace    https://github.com/local/yt-bulk-manager
-// @version      1.0.0
-// @description  Adds multi-select checkboxes to YouTube playlist pages. Bulk-copy, move, or remove videos across playlists via YouTube's internal API.
-// @author       local
-// @match        https://www.youtube.com/*
-// @grant        GM_xmlhttpRequest
-// @grant        unsafeWindow
-// @noframes
-// @run-at       document-idle
-// ==/UserScript==
-HEADER
-
-# ─── Concatenate source files in dependency order ────────────────────────────
-# Order matters: each module may reference globals from the previous one.
-FILES=(
-  "$SRC/core/config.js"
-  "$SRC/core/logger.js"
-  "$SRC/core/errors.js"
-  "$SRC/core/session.js"
-  "$SRC/ui/state.js"
-  "$SRC/ui/checkbox.js"
-  "$SRC/ui/overlay.js"
-  "$SRC/api/playlists.js"
-  "$SRC/api/dispatcher.js"
-  "$SRC/observer.js"
-  "main.js"
-)
-
-for f in "${FILES[@]}"; do
-  echo "" >> "$OUT"
-  echo "// ─── $f ───────────────────────────────────────────────────────" >> "$OUT"
-  cat "$f" >> "$OUT"
-done
-
-echo ""
-echo "  ✓  $OUT  ($(wc -c < "$OUT") bytes, $(wc -l < "$OUT") lines)"
-echo ""
+cd "$(dirname "$0")"
+node scripts/build.mjs

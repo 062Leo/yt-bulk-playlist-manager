@@ -4,15 +4,30 @@ A Tampermonkey/Violentmonkey userscript that adds multi-select checkboxes to You
 
 ## Features
 
-- **Checkboxes** on every video row in a playlist — click to select, **Shift+Click** to range-select
-- **Copy** — add selected videos to another playlist (originals stay)
-- **Move** — copy selected videos to another playlist **and** remove them from the current one
-- **Remove** — delete selected videos from the current playlist
-- **Duplicate detection** — warns you before copying/moving videos that already exist in the target playlist, and lets you skip them
-- **Confirmation dialogs** — every action prompts you before executing, with clear descriptions of what will happen
-- **Progress dialog** — shows a progress bar and status message during long operations (e.g. moving 40 videos)
-- **Safe batching** — dispatches requests in chunks of 50 with 500 ms delays to avoid rate-limiting
-- **SPA-aware** — automatically re-initialises on YouTube's virtual navigation (`yt-navigate-finish`)
+| Feature                         | What it does                                                       |
+| ------------------------------- | ------------------------------------------------------------------ |
+| Checkboxes                      | On every playlist row; **Shift+Click** selects a range             |
+| Copy / Move / Remove            | Bulk add to another playlist, add + remove from current, or remove |
+| Duplicate detection             | Videos already in the target are listed and skipped                |
+| SongVoyage import               | `#sv-import=…` link opens an import dialog on any youtube.com page |
+| Progress + confirmation dialogs | Every action is confirmed; long runs show a progress bar           |
+| Safe batching                   | Sequential chunks of 50, ≥ 500 ms apart, 429 back-off              |
+| SPA-aware                       | Re-initialises on YouTube's virtual navigation                     |
+
+## SongVoyage import
+
+SongVoyage opens `https://www.youtube.com/feed/playlists#sv-import=<payload>`.
+
+| Item        | Contract                                                                                                                                 |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `<payload>` | base64url (RFC 4648 §5, no padding) of UTF-8 JSON `{"v":1,"title":"…","ids":["<11-char id>", …]}`                                        |
+| ids         | Must match `/^[A-Za-z0-9_-]{11}$/`; invalid ones dropped, duplicates removed (order kept), up to ~5000                                   |
+| Unknown `v` | Dialog "Update the userscript"                                                                                                           |
+| Hash        | Captured and removed at `document-start` (`history.replaceState`), before YouTube can rewrite the URL, so a reload does not import again |
+
+Flow: dialog "Import N songs from SongVoyage" → **Create new playlist** (name prefilled, Private / Unlisted / Public) or **Add to existing playlist** (shows "X already in playlist, will be skipped") → progress → "Added N, skipped M (duplicates), failed K" with an _Open playlist_ link.
+
+New playlists are created with `POST /youtubei/v1/playlist/create` (first 10 videos); the rest is added via `edit_playlist` in chunks of 50. If the create call with videos fails, an empty playlist is created and everything is added in chunks. YouTube limits a playlist to 5000 videos.
 
 ## Installation
 
@@ -38,18 +53,22 @@ For developers who want to edit the source and see changes immediately without r
 
 > **WSL note:** If you develop from WSL but the project lives on Windows (`C:\...`), the `@require` paths must use Windows-style paths (`file:///C:/...`), not `/mnt/c/...`).
 
-## Build
+## Development
 
-To produce the standalone userscript from source, run one of the following in the project root:
+Requires Node ≥ 20. Runtime stays dependency-free: the output is one plain `.user.js`.
 
-| Platform | Command |
-|----------|---------|
-| Linux / macOS / WSL | `./build.sh` |
-| Windows (PowerShell) | `.\build.ps1` |
+| Command          | What                                                                                 |
+| ---------------- | ------------------------------------------------------------------------------------ |
+| `npm ci`         | Install dev dependencies                                                             |
+| `npm run build`  | Build `dist/yt-bulk-playlist-manager.user.js` (same as `./build.sh` / `.\build.ps1`) |
+| `npm test`       | Vitest + jsdom tests                                                                 |
+| `npm run lint`   | ESLint (flat config)                                                                 |
+| `npm run format` | Prettier (write)                                                                     |
+| `npm run check`  | lint → format check → tests → build → `node --check` on the build (CI)               |
 
-Output: `dist/yt-bulk-playlist-manager.user.js`
+The build concatenates the sources in the `@require` order of `loader.user.js` (single source of truth) and uses the version from `package.json` (must match `loader.user.js`).
 
-Both build scripts concatenate all source modules in dependency order into a single `.user.js` file. No bundler, no npm, no dependencies required.
+Tests evaluate the global-scope sources (no `module.exports` footer) inside one function scope in jsdom and get every top-level declaration back (`tests/load.js`). `main.js` is not loaded in tests (it patches history and starts timers).
 
 ## Project Structure
 
@@ -57,8 +76,9 @@ Both build scripts concatenate all source modules in dependency order into a sin
 yt-bulk-playlist-manager/
 ├── loader.user.js              ← Dev loader (requires source files from disk)
 ├── main.js                     ← Application entry point, wires all modules
-├── build.sh                    ← Build script for Linux/macOS/WSL → dist/*.user.js
-├── build.ps1                   ← Build script for Windows (PowerShell) → dist/*.user.js
+├── build.sh / build.ps1        ← Wrappers for `node scripts/build.mjs`
+├── scripts/                    ← build.mjs (bundle), globals.mjs (top-level names for lint/tests)
+├── tests/                      ← Vitest tests + loader for the global-scope sources
 ├── dist/
 │   └── yt-bulk-playlist-manager.user.js  ← Standalone userscript (ready to install)
 ├── src/
@@ -70,10 +90,14 @@ yt-bulk-playlist-manager/
 │   ├── ui/
 │   │   ├── checkbox.js         ← Injects checkboxes into playlist video rows
 │   │   ├── overlay.js          ← Floating toolbar + confirmation/progress dialogs
+│   │   ├── importDialog.js     ← SongVoyage import / error / result dialogs
 │   │   └── state.js            ← Selection state manager (selectedIds, shift-click index)
 │   ├── api/
 │   │   ├── playlists.js        ← Fetch user playlists, check existing videos, resolve setVideoIds
-│   │   └── dispatcher.js       ← Batch add/remove via YouTube's edit_playlist endpoint
+│   │   └── dispatcher.js       ← Batch add/remove (edit_playlist), playlist/create
+│   ├── import/
+│   │   ├── payload.js          ← #sv-import parsing + validation, hash removal
+│   │   └── songvoyage.js       ← Import flow (dialog → create/add → result)
 │   └── observer.js             ← MutationObserver for lazy-loaded video rows
 ```
 
@@ -90,7 +114,7 @@ yt-bulk-playlist-manager/
 ## Architecture Notes
 
 - No `import`/`export` — Tampermonkey evaluates `@require`d files sequentially in the same global scope. File order **is** the dependency chain.
-- No build step for development — the `loader.user.js` approach gives instant hot-reload.
+- No build step for development — the `loader.user.js` approach gives instant hot-reload. New files need an `@require` line there (the build reads it).
 - YouTube's internal API is used (`/youtubei/v1/browse/edit_playlist`) — no official Google API calls, no quota.
 - Rate-limiting is avoided by sequential chunked requests with 500 ms minimum spacing.
 - All user-facing errors are shown in the floating toolbar; technical details are logged to the console under the `[YT-BULK]` filter.
@@ -98,4 +122,3 @@ yt-bulk-playlist-manager/
 ## Disclaimer
 
 This script was created in **May 2026** and relies on YouTube's internal, undocumented API endpoints (`/youtubei/v1/browse/edit_playlist`) and DOM selectors. If YouTube changes its frontend architecture or API contracts, the script may stop working and will need to be updated.
-
