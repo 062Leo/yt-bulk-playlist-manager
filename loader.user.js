@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YT Bulk Playlist Manager – Loader
 // @namespace    https://github.com/local/yt-bulk-manager
-// @version      1.0.0
+// @version      1.1.0
 // @description  [DEV] Hot-reload loader – @require's source files from disk. Use the standalone build from dist/ for normal installation.
 // @author       local
 // @match        https://www.youtube.com/*
@@ -16,8 +16,11 @@
 // @require      file:///C:/LEO/Projekte/GitHub/yt-bulk-playlist-manager/src/ui/state.js
 // @require      file:///C:/LEO/Projekte/GitHub/yt-bulk-playlist-manager/src/ui/checkbox.js
 // @require      file:///C:/LEO/Projekte/GitHub/yt-bulk-playlist-manager/src/ui/overlay.js
+// @require      file:///C:/LEO/Projekte/GitHub/yt-bulk-playlist-manager/src/ui/importDialog.js
 // @require      file:///C:/LEO/Projekte/GitHub/yt-bulk-playlist-manager/src/api/playlists.js
 // @require      file:///C:/LEO/Projekte/GitHub/yt-bulk-playlist-manager/src/api/dispatcher.js
+// @require      file:///C:/LEO/Projekte/GitHub/yt-bulk-playlist-manager/src/import/payload.js
+// @require      file:///C:/LEO/Projekte/GitHub/yt-bulk-playlist-manager/src/import/songvoyage.js
 // @require      file:///C:/LEO/Projekte/GitHub/yt-bulk-playlist-manager/src/observer.js
 // @require      file:///C:/LEO/Projekte/GitHub/yt-bulk-playlist-manager/main.js
 // ==/UserScript==

@@ -34,11 +34,7 @@ class ApiError extends Error {
    * @returns {ApiError}
    */
   static fromResponse(res) {
-    return new ApiError(
-      'HTTP ' + res.status + ': ' + res.statusText,
-      res.status,
-      res.url
-    );
+    return new ApiError('HTTP ' + res.status + ': ' + res.statusText, res.status, res.url);
   }
 }
 

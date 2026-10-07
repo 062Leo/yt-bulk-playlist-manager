@@ -1,15 +1,23 @@
 // playlists.js – Fetches the user's playlist list and checks for existing videos via YouTube's internal browse endpoint
 
+function _deepFind(obj, targetKey) {
+  if (!obj || typeof obj !== 'object') return null;
+  if (obj[targetKey]) return obj[targetKey];
+  for (var key in obj) {
+    if (!Object.prototype.hasOwnProperty.call(obj, key)) continue;
+    var found = _deepFind(obj[key], targetKey);
+    if (found) return found;
+  }
+  return null;
+}
+
 async function fetchUserPlaylists(session) {
   var endpoint = CONFIG.BROWSE_ENDPOINT + '?key=' + session.apiKey;
   var browseId = 'FEplaylist_aggregation';
 
   // Logger.info('Fetching user playlists...');
 
-  var headers = { 'Content-Type': 'application/json' };
-  if (session.authHeaders) {
-    Object.assign(headers, session.authHeaders);
-  }
+  var headers = await getRequestHeaders(session);
 
   var res = await fetch(endpoint, {
     method: 'POST',
@@ -17,8 +25,8 @@ async function fetchUserPlaylists(session) {
     headers: headers,
     body: JSON.stringify({
       context: session.context,
-      browseId: browseId
-    })
+      browseId: browseId,
+    }),
   });
 
   if (!res.ok) {
@@ -52,8 +60,11 @@ async function fetchUserPlaylists(session) {
     if (!items && data.contents && data.contents.singleColumnBrowseResultsRenderer) {
       var stabs = data.contents.singleColumnBrowseResultsRenderer.tabs;
       var scontent = stabs[0].tabRenderer.content;
-      items = (scontent.sectionListRenderer || scontent.gridRenderer || scontent.richGridRenderer || {}).contents ||
-              (scontent.sectionListRenderer || scontent.gridRenderer || scontent.richGridRenderer || {}).items;
+      items =
+        (scontent.sectionListRenderer || scontent.gridRenderer || scontent.richGridRenderer || {})
+          .contents ||
+        (scontent.sectionListRenderer || scontent.gridRenderer || scontent.richGridRenderer || {})
+          .items;
     }
 
     if (!items && data.contents) {
@@ -68,15 +79,17 @@ async function fetchUserPlaylists(session) {
     }
   } catch (e) {
     throw new ParseError(
-      'Failed to navigate playlist response tree: ' + e.message +
-      '. Top-level response keys: ' + JSON.stringify(Object.keys(data))
+      'Failed to navigate playlist response tree: ' +
+        e.message +
+        '. Top-level response keys: ' +
+        JSON.stringify(Object.keys(data)),
     );
   }
 
   if (!items) {
     throw new ParseError(
       'No playlist items found in response. contents keys: ' +
-      JSON.stringify(data.contents ? Object.keys(data.contents) : 'null')
+        JSON.stringify(data.contents ? Object.keys(data.contents) : 'null'),
     );
   }
 
@@ -92,9 +105,11 @@ async function fetchUserPlaylists(session) {
     if (item.lockupViewModel) {
       var vm = item.lockupViewModel;
       var plId = vm.contentId;
-      var title = vm.metadata && vm.metadata.lockupMetadataViewModel &&
-                  vm.metadata.lockupMetadataViewModel.title &&
-                  vm.metadata.lockupMetadataViewModel.title.content;
+      var title =
+        vm.metadata &&
+        vm.metadata.lockupMetadataViewModel &&
+        vm.metadata.lockupMetadataViewModel.title &&
+        vm.metadata.lockupMetadataViewModel.title.content;
       if (plId && title) {
         playlists.push({ playlistId: plId, title: title });
       }
@@ -110,17 +125,23 @@ async function fetchUserPlaylists(session) {
         if (subRenderer && subRenderer.playlistId && subRenderer.title && subRenderer.title.runs) {
           playlists.push({
             playlistId: subRenderer.playlistId,
-            title: subRenderer.title.runs[0].text
+            title: subRenderer.title.runs[0].text,
           });
         }
       }
       continue;
     }
 
-    if (renderer && renderer.playlistId && renderer.title && renderer.title.runs && renderer.title.runs.length > 0) {
+    if (
+      renderer &&
+      renderer.playlistId &&
+      renderer.title &&
+      renderer.title.runs &&
+      renderer.title.runs.length > 0
+    ) {
       playlists.push({
         playlistId: renderer.playlistId,
-        title: renderer.title.runs[0].text
+        title: renderer.title.runs[0].text,
       });
     }
   }
@@ -130,21 +151,18 @@ async function fetchUserPlaylists(session) {
 }
 
 async function fetchPlaylistSetVideoIds(session, playlistId, targetVideoIds, maxPages) {
-  if (maxPages === undefined) maxPages = 10;
+  if (maxPages === undefined) maxPages = CONFIG.PLAYLIST_SCAN_MAX_PAGES;
 
   var endpoint = CONFIG.BROWSE_ENDPOINT + '?key=' + session.apiKey;
   var browseId = 'VL' + playlistId;
-  var videoIdToSetId = {};
-  var targetSet = {};
+  var videoIdToSetId = Object.create(null);
+  var targetSet = Object.create(null);
   for (var i = 0; i < targetVideoIds.length; i++) {
     targetSet[targetVideoIds[i]] = true;
   }
-  var remaining = targetVideoIds.length;
+  var remaining = Object.keys(targetSet).length;
 
-  var headers = { 'Content-Type': 'application/json' };
-  if (session.authHeaders) {
-    Object.assign(headers, session.authHeaders);
-  }
+  var headers = await getRequestHeaders(session);
 
   var continuationToken = null;
 
@@ -160,7 +178,7 @@ async function fetchPlaylistSetVideoIds(session, playlistId, targetVideoIds, max
         method: 'POST',
         credentials: 'include',
         headers: headers,
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
       });
     } catch (e) {
       Logger.warn('Failed to fetch playlist contents for setVideoId lookup:', e.message);
@@ -182,7 +200,10 @@ async function fetchPlaylistSetVideoIds(session, playlistId, targetVideoIds, max
         var ra = data.onResponseReceivedActions;
         if (ra && ra[0] && ra[0].appendContinuationItemsAction) {
           contents = ra[0].appendContinuationItemsAction.continuationItems;
-        } else if (data.continuationContents && data.continuationContents.playlistVideoListContinuation) {
+        } else if (
+          data.continuationContents &&
+          data.continuationContents.playlistVideoListContinuation
+        ) {
           contents = data.continuationContents.playlistVideoListContinuation.contents;
         } else {
           // Logger.debug('fetchPlaylistSetVideoIds: unknown continuation response format');
@@ -194,26 +215,15 @@ async function fetchPlaylistSetVideoIds(session, playlistId, targetVideoIds, max
           break;
         }
 
-        function deepFind(obj, targetKey) {
-          if (!obj || typeof obj !== 'object') return null;
-          if (obj[targetKey]) return obj[targetKey];
-          for (var key in obj) {
-            if (!obj.hasOwnProperty(key)) continue;
-            var found = deepFind(obj[key], targetKey);
-            if (found) return found;
-          }
-          return null;
-        }
-
-        var pvl = deepFind(topContents, 'playlistVideoListRenderer');
+        var pvl = _deepFind(topContents, 'playlistVideoListRenderer');
         if (pvl && pvl.contents) {
           contents = pvl.contents;
         } else {
-          var rgr = deepFind(topContents, 'richGridRenderer');
+          var rgr = _deepFind(topContents, 'richGridRenderer');
           if (rgr && rgr.contents) {
             contents = rgr.contents;
           } else {
-            var slr = deepFind(topContents, 'sectionListRenderer');
+            var slr = _deepFind(topContents, 'sectionListRenderer');
             if (slr && slr.contents) {
               for (var s = 0; s < slr.contents.length; s++) {
                 var sub = slr.contents[s];
@@ -221,8 +231,11 @@ async function fetchPlaylistSetVideoIds(session, playlistId, targetVideoIds, max
                   contents = sub.playlistVideoListRenderer.contents;
                   break;
                 }
-                if (sub.richItemRenderer && sub.richItemRenderer.content &&
-                    sub.richItemRenderer.content.playlistVideoRenderer) {
+                if (
+                  sub.richItemRenderer &&
+                  sub.richItemRenderer.content &&
+                  sub.richItemRenderer.content.playlistVideoRenderer
+                ) {
                   contents = slr.contents;
                   break;
                 }
@@ -248,6 +261,9 @@ async function fetchPlaylistSetVideoIds(session, playlistId, targetVideoIds, max
 
     // Logger.debug('fetchPlaylistSetVideoIds: found', contents.length, 'items on page', page);
 
+    // Each page carries its own continuation token (or none on the last page).
+    continuationToken = null;
+
     for (var c = 0; c < contents.length; c++) {
       var item = contents[c];
       if (item.continuationItemRenderer) {
@@ -256,9 +272,13 @@ async function fetchPlaylistSetVideoIds(session, playlistId, targetVideoIds, max
           continuationToken = contEp.continuationCommand.token;
         } else if (contEp && contEp.command && contEp.command.continuationCommand) {
           continuationToken = contEp.command.continuationCommand.token;
-        } else if (item.continuationItemRenderer.button && item.continuationItemRenderer.button.command &&
-                   item.continuationItemRenderer.button.command.continuationCommand) {
-          continuationToken = item.continuationItemRenderer.button.command.continuationCommand.token;
+        } else if (
+          item.continuationItemRenderer.button &&
+          item.continuationItemRenderer.button.command &&
+          item.continuationItemRenderer.button.command.continuationCommand
+        ) {
+          continuationToken =
+            item.continuationItemRenderer.button.command.continuationCommand.token;
         }
         continue;
       }
@@ -268,6 +288,7 @@ async function fetchPlaylistSetVideoIds(session, playlistId, targetVideoIds, max
         var setVideoId = renderer.setVideoId;
         if (setVideoId) {
           videoIdToSetId[renderer.videoId] = setVideoId;
+          targetSet[renderer.videoId] = false;
           remaining--;
           if (remaining === 0) break;
         }
@@ -276,10 +297,15 @@ async function fetchPlaylistSetVideoIds(session, playlistId, targetVideoIds, max
       if (!renderer) {
         var ric = item.richItemRenderer && item.richItemRenderer.content;
         if (ric) {
-          if (ric.playlistVideoRenderer && ric.playlistVideoRenderer.videoId && targetSet[ric.playlistVideoRenderer.videoId]) {
-            var setVideoId = ric.playlistVideoRenderer.setVideoId;
-            if (setVideoId) {
-              videoIdToSetId[ric.playlistVideoRenderer.videoId] = setVideoId;
+          if (
+            ric.playlistVideoRenderer &&
+            ric.playlistVideoRenderer.videoId &&
+            targetSet[ric.playlistVideoRenderer.videoId]
+          ) {
+            var ricSetVideoId = ric.playlistVideoRenderer.setVideoId;
+            if (ricSetVideoId) {
+              videoIdToSetId[ric.playlistVideoRenderer.videoId] = ricSetVideoId;
+              targetSet[ric.playlistVideoRenderer.videoId] = false;
               remaining--;
               if (remaining === 0) break;
             }
@@ -289,6 +315,7 @@ async function fetchPlaylistSetVideoIds(session, playlistId, targetVideoIds, max
             var lockupSetVideoId = lockupVm.setVideoId || lockupVm.playlistSetVideoId;
             if (lockupSetVideoId) {
               videoIdToSetId[lockupVm.contentId] = lockupSetVideoId;
+              targetSet[lockupVm.contentId] = false;
               remaining--;
               if (remaining === 0) break;
             }
@@ -306,21 +333,18 @@ async function fetchPlaylistSetVideoIds(session, playlistId, targetVideoIds, max
 }
 
 async function fetchPlaylistVideoIds(session, playlistId, targetIds, maxPages) {
-  if (maxPages === undefined) maxPages = 10;
+  if (maxPages === undefined) maxPages = CONFIG.PLAYLIST_SCAN_MAX_PAGES;
 
   var endpoint = CONFIG.BROWSE_ENDPOINT + '?key=' + session.apiKey;
   var browseId = 'VL' + playlistId;
   var foundIds = [];
-  var targetSet = {};
+  var targetSet = Object.create(null);
   for (var i = 0; i < targetIds.length; i++) {
     targetSet[targetIds[i]] = true;
   }
-  var remaining = targetIds.length;
+  var remaining = Object.keys(targetSet).length;
 
-  var headers = { 'Content-Type': 'application/json' };
-  if (session.authHeaders) {
-    Object.assign(headers, session.authHeaders);
-  }
+  var headers = await getRequestHeaders(session);
 
   var continuationToken = null;
 
@@ -336,7 +360,7 @@ async function fetchPlaylistVideoIds(session, playlistId, targetIds, maxPages) {
         method: 'POST',
         credentials: 'include',
         headers: headers,
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
       });
     } catch (e) {
       Logger.warn('fetchPlaylistVideoIds: fetch failed:', e.message);
@@ -356,7 +380,10 @@ async function fetchPlaylistVideoIds(session, playlistId, targetIds, maxPages) {
         var ra = data.onResponseReceivedActions;
         if (ra && ra[0] && ra[0].appendContinuationItemsAction) {
           contents = ra[0].appendContinuationItemsAction.continuationItems;
-        } else if (data.continuationContents && data.continuationContents.playlistVideoListContinuation) {
+        } else if (
+          data.continuationContents &&
+          data.continuationContents.playlistVideoListContinuation
+        ) {
           contents = data.continuationContents.playlistVideoListContinuation.contents;
         } else {
           // Logger.debug('fetchPlaylistVideoIds: unknown continuation response format');
@@ -368,27 +395,16 @@ async function fetchPlaylistVideoIds(session, playlistId, targetIds, maxPages) {
           break;
         }
 
-        function deepFind3(obj, targetKey) {
-          if (!obj || typeof obj !== 'object') return null;
-          if (obj[targetKey]) return obj[targetKey];
-          for (var key in obj) {
-            if (!obj.hasOwnProperty(key)) continue;
-            var found = deepFind3(obj[key], targetKey);
-            if (found) return found;
-          }
-          return null;
-        }
-
-        var pvl = deepFind3(topContents, 'playlistVideoListRenderer');
+        var pvl = _deepFind(topContents, 'playlistVideoListRenderer');
         if (pvl && pvl.contents) {
           contents = pvl.contents;
         } else {
           // YouTube may use various response structures
-          var rgr = deepFind3(topContents, 'richGridRenderer');
+          var rgr = _deepFind(topContents, 'richGridRenderer');
           if (rgr && rgr.contents) {
             contents = rgr.contents;
           } else {
-            var slr = deepFind3(topContents, 'sectionListRenderer');
+            var slr = _deepFind(topContents, 'sectionListRenderer');
             if (slr && slr.contents) {
               for (var s = 0; s < slr.contents.length; s++) {
                 var sub = slr.contents[s];
@@ -396,8 +412,11 @@ async function fetchPlaylistVideoIds(session, playlistId, targetIds, maxPages) {
                   contents = sub.playlistVideoListRenderer.contents;
                   break;
                 }
-                if (sub.richItemRenderer && sub.richItemRenderer.content &&
-                    sub.richItemRenderer.content.playlistVideoRenderer) {
+                if (
+                  sub.richItemRenderer &&
+                  sub.richItemRenderer.content &&
+                  sub.richItemRenderer.content.playlistVideoRenderer
+                ) {
                   contents = slr.contents;
                   break;
                 }
@@ -418,6 +437,9 @@ async function fetchPlaylistVideoIds(session, playlistId, targetIds, maxPages) {
 
     if (!contents) break;
 
+    // Each page carries its own continuation token (or none on the last page).
+    continuationToken = null;
+
     for (var c = 0; c < contents.length; c++) {
       var item = contents[c];
       if (item.continuationItemRenderer) {
@@ -426,9 +448,13 @@ async function fetchPlaylistVideoIds(session, playlistId, targetIds, maxPages) {
           continuationToken = contEp.continuationCommand.token;
         } else if (contEp && contEp.command && contEp.command.continuationCommand) {
           continuationToken = contEp.command.continuationCommand.token;
-        } else if (item.continuationItemRenderer.button && item.continuationItemRenderer.button.command &&
-                   item.continuationItemRenderer.button.command.continuationCommand) {
-          continuationToken = item.continuationItemRenderer.button.command.continuationCommand.token;
+        } else if (
+          item.continuationItemRenderer.button &&
+          item.continuationItemRenderer.button.command &&
+          item.continuationItemRenderer.button.command.continuationCommand
+        ) {
+          continuationToken =
+            item.continuationItemRenderer.button.command.continuationCommand.token;
         }
         continue;
       }
@@ -449,6 +475,7 @@ async function fetchPlaylistVideoIds(session, playlistId, targetIds, maxPages) {
 
       if (videoId && targetSet[videoId]) {
         foundIds.push(videoId);
+        targetSet[videoId] = false;
         remaining--;
         if (remaining === 0) break;
       }

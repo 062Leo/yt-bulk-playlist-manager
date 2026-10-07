@@ -1,6 +1,7 @@
 // main.js – Application entry point; wires all modules together and handles SPA re-initialisation
 
 var _initialising = false;
+var _initPending = false;
 var _buttonListenersWired = false;
 var _session = null;
 
@@ -11,10 +12,17 @@ function isPlaylistPage() {
 async function init() {
   // Only fully initialise on playlist pages; on other YouTube pages we
   // just keep the SPA listener alive so navigation TO a playlist works.
-  if (!isPlaylistPage()) return;
+  if (!isPlaylistPage()) {
+    // Left a playlist page: drop the toolbar, observer and selection.
+    stopObserver();
+    destroyOverlay();
+    if (selectionState.getCount() > 0) selectionState.clear();
+    return;
+  }
 
   if (_initialising) {
-    // Logger.debug('init() already in progress, skipping');
+    // Navigation during init: run again once the current init finishes.
+    _initPending = true;
     return;
   }
 
@@ -51,9 +59,10 @@ async function init() {
         'font-family:sans-serif',
         'font-size:14px',
         'text-align:center',
-        'box-shadow:0 2px 8px rgba(0,0,0,0.3)'
+        'box-shadow:0 2px 8px rgba(0,0,0,0.3)',
       ].join(';');
-      notification.textContent = 'YT Bulk Playlist Manager: Could not initialise \u2013 YouTube session data (ytcfg) not found. Please refresh the page.';
+      notification.textContent =
+        'YT Bulk Playlist Manager: Could not initialise \u2013 YouTube session data (ytcfg) not found. Please refresh the page.';
       document.body.appendChild(notification);
 
       return;
@@ -83,6 +92,10 @@ async function init() {
     Logger.error('Unhandled error during init:', err);
   } finally {
     _initialising = false;
+    if (_initPending) {
+      _initPending = false;
+      init();
+    }
   }
 }
 
@@ -111,13 +124,37 @@ function wireButtons() {
       // Build confirmation message with duplicate info
       var confirmMsg;
       if (newIds.length === videoIds.length) {
-        confirmMsg = videoIds.length + ' ' + pluralize(videoIds.length, 'video') + ' will be copied to "' + playlistName + '". The original videos remain in the current playlist.';
+        confirmMsg =
+          videoIds.length +
+          ' ' +
+          pluralize(videoIds.length, 'video') +
+          ' will be copied to "' +
+          playlistName +
+          '". The original videos remain in the current playlist.';
       } else if (newIds.length === 0) {
-        confirmMsg = (videoIds.length === 1
-          ? 'The selected video is already in "' + playlistName + '"'
-          : 'All ' + videoIds.length + ' selected videos are already in "' + playlistName + '"') + '. Nothing will be copied.';
+        confirmMsg =
+          (videoIds.length === 1
+            ? 'The selected video is already in "' + playlistName + '"'
+            : 'All ' + videoIds.length + ' selected videos are already in "' + playlistName + '"') +
+          '. Nothing will be copied.';
       } else {
-        confirmMsg = existingIds.length + ' of ' + videoIds.length + ' selected ' + pluralize(videoIds.length, 'video') + ' are already in "' + playlistName + '".\n\nOnly ' + newIds.length + ' new ' + pluralize(newIds.length, 'video') + ' will be copied. The ' + existingIds.length + ' existing ' + pluralize(existingIds.length, 'video') + ' will be skipped.';
+        confirmMsg =
+          existingIds.length +
+          ' of ' +
+          videoIds.length +
+          ' selected ' +
+          pluralize(videoIds.length, 'video') +
+          ' are already in "' +
+          playlistName +
+          '".\n\nOnly ' +
+          newIds.length +
+          ' new ' +
+          pluralize(newIds.length, 'video') +
+          ' will be copied. The ' +
+          existingIds.length +
+          ' existing ' +
+          pluralize(existingIds.length, 'video') +
+          ' will be skipped.';
       }
 
       var confirmType = newIds.length < videoIds.length ? 'warning' : 'info';
@@ -194,13 +231,37 @@ function wireButtons() {
       // Build confirmation message with duplicate info
       var confirmMsg;
       if (newIds.length === videoIds.length) {
-        confirmMsg = videoIds.length + ' ' + pluralize(videoIds.length, 'video') + ' will be added to "' + playlistName + '" and then removed from the current playlist.';
+        confirmMsg =
+          videoIds.length +
+          ' ' +
+          pluralize(videoIds.length, 'video') +
+          ' will be added to "' +
+          playlistName +
+          '" and then removed from the current playlist.';
       } else if (newIds.length === 0) {
-        confirmMsg = (videoIds.length === 1
-          ? 'The selected video is already in "' + playlistName + '"'
-          : 'All ' + videoIds.length + ' selected videos are already in "' + playlistName + '"') + '.\n\nRemove from the current playlist anyway?';
+        confirmMsg =
+          (videoIds.length === 1
+            ? 'The selected video is already in "' + playlistName + '"'
+            : 'All ' + videoIds.length + ' selected videos are already in "' + playlistName + '"') +
+          '.\n\nRemove from the current playlist anyway?';
       } else {
-        confirmMsg = existingIds.length + ' of ' + videoIds.length + ' selected ' + pluralize(videoIds.length, 'video') + ' are already in "' + playlistName + '".\n\nOnly ' + newIds.length + ' new ' + pluralize(newIds.length, 'video') + ' will be moved (added to target and removed from current). The ' + existingIds.length + ' existing ' + pluralize(existingIds.length, 'video') + ' will be skipped.';
+        confirmMsg =
+          existingIds.length +
+          ' of ' +
+          videoIds.length +
+          ' selected ' +
+          pluralize(videoIds.length, 'video') +
+          ' are already in "' +
+          playlistName +
+          '".\n\nOnly ' +
+          newIds.length +
+          ' new ' +
+          pluralize(newIds.length, 'video') +
+          ' will be moved (added to target and removed from current). The ' +
+          existingIds.length +
+          ' existing ' +
+          pluralize(existingIds.length, 'video') +
+          ' will be skipped.';
       }
 
       var confirmType = newIds.length < videoIds.length ? 'warning' : 'info';
@@ -227,30 +288,26 @@ function wireButtons() {
             }
             videoPayloads.push({
               videoId: vid,
-              setVideoId: setVideoId
+              setVideoId: setVideoId,
             });
           }
 
           updateProgress('Removing from current playlist...', 70);
+          var moveResult;
           try {
-            await dispatchRemove(_session, currentPlaylistId, videoPayloads);
+            moveResult = await dispatchRemove(_session, currentPlaylistId, videoPayloads);
           } catch (removeErr) {
-            setOverlayError('Added to target but failed to remove from current: ' + removeErr.message);
+            removeRowsFor(removeErr.removedIds || []);
+            setOverlayError(
+              'Added to target but failed to remove from current: ' + removeErr.message,
+            );
             selectionState.clear();
             uncheckAll();
             return;
           }
 
-          // Remove DOM elements for all moved videos
-          for (var ri = 0; ri < newIds.length; ri++) {
-            var allCbs = document.querySelectorAll(
-              '.' + CONFIG.MANAGED_CLASS + ' input[type="checkbox"][data-video-id="' + newIds[ri] + '"]'
-            );
-            for (var rj = 0; rj < allCbs.length; rj++) {
-              var renderer = allCbs[rj].closest(CONFIG.VIDEO_RENDERER);
-              if (renderer) renderer.remove();
-            }
-          }
+          // Remove DOM elements only for videos that were really removed
+          removeRowsFor(moveResult.removedIds);
 
           updateProgress('Done!', 100);
           var skippedByPrecheck = videoIds.length - newIds.length;
@@ -258,39 +315,50 @@ function wireButtons() {
           if (skippedByPrecheck > 0) {
             successMsg += ' ' + skippedByPrecheck + ' skipped (already in target)';
           }
+          if (moveResult.skippedIds.length > 0) {
+            successMsg += ' ' + moveResult.skippedIds.length + ' could not be removed from current';
+          }
           setOverlaySuccess(successMsg);
         } else {
           updateProgress('Removing from current playlist...', 30);
           // All were already in target — user chose "Yes, Delete"
           // Remove all selected from current
-          var allVideoIdToSetId = await fetchPlaylistSetVideoIds(_session, currentPlaylistId, videoIds);
+          var allVideoIdToSetId = await fetchPlaylistSetVideoIds(
+            _session,
+            currentPlaylistId,
+            videoIds,
+          );
           var allVideoPayloads = [];
           for (var vi2 = 0; vi2 < videoIds.length; vi2++) {
             var vid2 = videoIds[vi2];
             var setVideoId2 = allVideoIdToSetId[vid2] || null;
             if (!setVideoId2) {
-              Logger.warn('No setVideoId found for', vid2, 'in current playlist', currentPlaylistId);
+              Logger.warn(
+                'No setVideoId found for',
+                vid2,
+                'in current playlist',
+                currentPlaylistId,
+              );
             }
             allVideoPayloads.push({
               videoId: vid2,
-              setVideoId: setVideoId2
+              setVideoId: setVideoId2,
             });
           }
 
           try {
-            await dispatchRemove(_session, currentPlaylistId, allVideoPayloads);
-            for (var ri2 = 0; ri2 < videoIds.length; ri2++) {
-              var allCbs2 = document.querySelectorAll(
-                '.' + CONFIG.MANAGED_CLASS + ' input[type="checkbox"][data-video-id="' + videoIds[ri2] + '"]'
-              );
-              for (var rj2 = 0; rj2 < allCbs2.length; rj2++) {
-                var renderer2 = allCbs2[rj2].closest(CONFIG.VIDEO_RENDERER);
-                if (renderer2) renderer2.remove();
-              }
-            }
+            var allResult = await dispatchRemove(_session, currentPlaylistId, allVideoPayloads);
+            removeRowsFor(allResult.removedIds);
             updateProgress('Done!', 100);
-            setOverlaySuccess('Removed ' + videoIds.length + ' ' + pluralize(videoIds.length, 'video') + ' from current playlist');
+            setOverlaySuccess(
+              'Removed ' +
+                allResult.count +
+                ' ' +
+                pluralize(allResult.count, 'video') +
+                ' from current playlist',
+            );
           } catch (removeErr) {
+            removeRowsFor(removeErr.removedIds || []);
             setOverlayError('Failed to remove from current: ' + removeErr.message);
           }
         }
@@ -325,8 +393,11 @@ function wireButtons() {
 
       var confirmed = await showConfirmDialog(
         'Remove Videos',
-        videoIds.length + ' ' + pluralize(videoIds.length, 'video') + ' will be permanently removed from the current playlist. This action cannot be undone.',
-        'warning'
+        videoIds.length +
+          ' ' +
+          pluralize(videoIds.length, 'video') +
+          ' will be permanently removed from the current playlist. This action cannot be undone.',
+        'warning',
       );
       if (!confirmed) return;
 
@@ -345,25 +416,26 @@ function wireButtons() {
           }
           videoPayloads.push({
             videoId: vid,
-            setVideoId: setVideoId
+            setVideoId: setVideoId,
           });
         }
 
         updateProgress('Removing videos from playlist...', 30);
-        var result = await dispatchRemove(_session, currentPlaylistId, videoPayloads);
-
-        for (var ri = 0; ri < videoIds.length; ri++) {
-          var allCbs = document.querySelectorAll(
-            '.' + CONFIG.MANAGED_CLASS + ' input[type="checkbox"][data-video-id="' + videoIds[ri] + '"]'
-          );
-          for (var rj = 0; rj < allCbs.length; rj++) {
-            var renderer = allCbs[rj].closest(CONFIG.VIDEO_RENDERER);
-            if (renderer) renderer.remove();
-          }
+        var result;
+        try {
+          result = await dispatchRemove(_session, currentPlaylistId, videoPayloads);
+        } catch (removeErr) {
+          removeRowsFor(removeErr.removedIds || []);
+          throw removeErr;
         }
+        removeRowsFor(result.removedIds);
 
         updateProgress('Done!', 100);
-        setOverlaySuccess('Removed ' + result.count + ' ' + pluralize(result.count, 'video') + '!');
+        var removeMsg = 'Removed ' + result.count + ' ' + pluralize(result.count, 'video') + '!';
+        if (result.skippedIds.length > 0) {
+          removeMsg += ' ' + result.skippedIds.length + ' could not be removed (not found)';
+        }
+        setOverlaySuccess(removeMsg);
         selectionState.clear();
         uncheckAll();
       } catch (err) {
@@ -385,9 +457,22 @@ function wireButtons() {
   }
 }
 
+/** Removes the playlist rows of the given video ids from the page. */
+function removeRowsFor(videoIds) {
+  for (var i = 0; i < videoIds.length; i++) {
+    var boxes = document.querySelectorAll(
+      '.' + CONFIG.MANAGED_CLASS + ' input[type="checkbox"][data-video-id="' + videoIds[i] + '"]',
+    );
+    for (var j = 0; j < boxes.length; j++) {
+      var row = boxes[j].closest(CONFIG.VIDEO_RENDERER);
+      if (row) row.remove();
+    }
+  }
+}
+
 function uncheckAll() {
   var checkboxes = document.querySelectorAll(
-    '.' + CONFIG.MANAGED_CLASS + ' input[type="checkbox"][data-video-id]'
+    '.' + CONFIG.MANAGED_CLASS + ' input[type="checkbox"][data-video-id]',
   );
   for (var i = 0; i < checkboxes.length; i++) {
     checkboxes[i].checked = false;
@@ -428,6 +513,10 @@ function _onUrlChanged() {
 window.addEventListener('popstate', _onUrlChanged);
 window.addEventListener('yt-navigate-finish', _onUrlChanged);
 
+// SongVoyage import (#sv-import=...) works on every youtube.com page.
+window.addEventListener('yt-navigate-finish', checkSongVoyageImport);
+window.addEventListener('hashchange', checkSongVoyageImport);
+
 // Polling fallback — YouTube may use the Navigation API, location.assign,
 // or other mechanisms that bypass pushState/replaceState interception.
 setInterval(function () {
@@ -440,3 +529,4 @@ setInterval(function () {
 
 // Auto-start on first page load
 init();
+checkSongVoyageImport();

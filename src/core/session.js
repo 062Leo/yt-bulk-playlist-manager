@@ -12,9 +12,11 @@ async function computeSapisidHash(sapisid, origin) {
   var data = encoder.encode(message);
   var hashBuffer = await crypto.subtle.digest('SHA-1', data);
   var hashArray = Array.from(new Uint8Array(hashBuffer));
-  var hashHex = hashArray.map(function (b) {
-    return b.toString(16).padStart(2, '0');
-  }).join('');
+  var hashHex = hashArray
+    .map(function (b) {
+      return b.toString(16).padStart(2, '0');
+    })
+    .join('');
   return 'SAPISIDHASH ' + timestamp + '_' + hashHex;
 }
 
@@ -25,8 +27,8 @@ async function buildAuthHeaders() {
   var origin = window.location.origin;
   var hash = await computeSapisidHash(sapisid, origin);
   return {
-    'Authorization': hash,
-    'X-Origin': origin
+    Authorization: hash,
+    'X-Origin': origin,
   };
 }
 
@@ -52,11 +54,13 @@ function getSession() {
         clearInterval(poll);
         // Logger.success('Session acquired after', attempts, 'attempt(s)');
 
-        buildAuthHeaders().then(function (authHeaders) {
-          resolve({ apiKey: apiKey, context: context, authHeaders: authHeaders });
-        }).catch(function () {
-          resolve({ apiKey: apiKey, context: context, authHeaders: null });
-        });
+        buildAuthHeaders()
+          .then(function (authHeaders) {
+            resolve({ apiKey: apiKey, context: context, authHeaders: authHeaders });
+          })
+          .catch(function () {
+            resolve({ apiKey: apiKey, context: context, authHeaders: null });
+          });
 
         return;
       }
@@ -66,9 +70,13 @@ function getSession() {
         Logger.error(
           'ytcfg not available after',
           maxAttempts,
-          'attempts. Ensure you are on a YouTube page (playlist, watch, or library) and that the page has fully loaded.'
+          'attempts. Ensure you are on a YouTube page (playlist, watch, or library) and that the page has fully loaded.',
         );
-        reject(new SessionError('Failed to extract ytcfg session after ' + maxAttempts + ' polling attempts'));
+        reject(
+          new SessionError(
+            'Failed to extract ytcfg session after ' + maxAttempts + ' polling attempts',
+          ),
+        );
       }
     }, intervalMs);
   });
@@ -76,4 +84,22 @@ function getSession() {
 
 function getClientVersion(session) {
   return session.context && session.context.client && session.context.client.clientVersion;
+}
+
+/**
+ * Request headers for an authenticated youtubei call. The SAPISIDHASH carries a
+ * timestamp, so it is recomputed per request (long imports run for minutes);
+ * falls back to the headers captured with the session.
+ */
+async function getRequestHeaders(session) {
+  var headers = { 'Content-Type': 'application/json' };
+  var auth;
+  try {
+    auth = await buildAuthHeaders();
+  } catch (e) {
+    auth = null;
+  }
+  if (!auth) auth = session.authHeaders;
+  if (auth) Object.assign(headers, auth);
+  return headers;
 }

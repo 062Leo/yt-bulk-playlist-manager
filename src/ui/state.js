@@ -7,12 +7,14 @@ class SelectionState {
   }
 
   _notify() {
-    document.dispatchEvent(new CustomEvent('yt-bulk-selection-changed', {
-      detail: {
-        count: this._selectedIds.length,
-        ids: this._selectedIds.slice()
-      }
-    }));
+    document.dispatchEvent(
+      new CustomEvent('yt-bulk-selection-changed', {
+        detail: {
+          count: this._selectedIds.length,
+          ids: this._selectedIds.slice(),
+        },
+      }),
+    );
   }
 
   add(videoId) {
