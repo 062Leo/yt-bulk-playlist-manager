@@ -7,7 +7,7 @@ function _findPlaylistContentsRoot() {
   var selectors = [
     'ytd-playlist-video-list-renderer #contents',
     '#contents.ytd-playlist-video-list-renderer',
-    'ytd-playlist-video-list-renderer'
+    'ytd-playlist-video-list-renderer',
   ];
   for (var s = 0; s < selectors.length; s++) {
     var el = document.querySelector(selectors[s]);

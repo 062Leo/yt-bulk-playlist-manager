@@ -20,7 +20,7 @@ function findPlaylistEditEndpoint(obj) {
     visited.add(current);
 
     for (var key in current) {
-      if (!current.hasOwnProperty(key)) continue;
+      if (!Object.prototype.hasOwnProperty.call(current, key)) continue;
       var val = current[key];
       if (key === 'playlistEditEndpoint' && val) {
         return val;
@@ -100,7 +100,7 @@ function injectCheckbox(rendererElement) {
       'cursor:pointer',
       'accent-color:#065fd4',
       'margin:0 12px 0 0',
-      'align-self:center'
+      'align-self:center',
     ].join(';');
 
     checkbox.addEventListener('click', function (event) {
@@ -116,7 +116,7 @@ function injectCheckbox(rendererElement) {
       }
 
       var allCbs = document.querySelectorAll(
-        CONFIG.VIDEO_RENDERER + ' input[type="checkbox"][data-video-id]'
+        CONFIG.VIDEO_RENDERER + ' input[type="checkbox"][data-video-id]',
       );
       var currentIndex = _findCheckboxIndex(checkbox, allCbs);
 
@@ -149,8 +149,6 @@ function injectCheckbox(rendererElement) {
 
     content.prepend(checkbox);
     rendererElement.classList.add(CONFIG.MANAGED_CLASS);
-
-
   } catch (e) {
     throw new InjectionError('Failed to inject checkbox: ' + e.message);
   }

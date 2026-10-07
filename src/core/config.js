@@ -30,8 +30,23 @@ const CONFIG = Object.freeze({
 
   /** YouTube internal endpoint for batch-editing playlists (add/remove videos). */
   EDIT_PLAYLIST_ENDPOINT: 'https://www.youtube.com/youtubei/v1/browse/edit_playlist',
+
+  /** YouTube internal endpoint for creating a playlist. */
+  PLAYLIST_CREATE_ENDPOINT: 'https://www.youtube.com/youtubei/v1/playlist/create',
+
+  /** Max browse pages (~100 videos each) scanned for the duplicate pre-check / setVideoId lookup. */
+  PLAYLIST_SCAN_MAX_PAGES: 100,
+
+  /** URL hash key used by SongVoyage: #sv-import=<base64url JSON>. */
+  IMPORT_HASH_KEY: 'sv-import',
+
+  /** Payload versions this script understands. */
+  IMPORT_SUPPORTED_VERSION: 1,
+
+  /** Videos sent with playlist/create; the rest go through edit_playlist in chunks. */
+  IMPORT_CREATE_BATCH_SIZE: 10,
 });
 
 function pluralize(count, singular, plural) {
-  return count === 1 ? singular : (plural || singular + 's');
+  return count === 1 ? singular : plural || singular + 's';
 }

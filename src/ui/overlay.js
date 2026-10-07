@@ -46,12 +46,13 @@ function createOverlay() {
     'max-width:calc(100vw - 48px)',
     'box-sizing:border-box',
     'flex-direction:column',
-    'gap:8px'
+    'gap:8px',
   ].join(';');
 
   // ---- Row ----
   var row = document.createElement('div');
-  row.style.cssText = 'display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:center;';
+  row.style.cssText =
+    'display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:center;';
 
   // Count badge
   var countBadge = document.createElement('span');
@@ -71,7 +72,7 @@ function createOverlay() {
     'font-size:14px',
     'max-width:200px',
     'min-width:120px',
-    'cursor:pointer'
+    'cursor:pointer',
   ].join(';');
 
   var defaultOption = document.createElement('option');
@@ -98,7 +99,7 @@ function createOverlay() {
     'padding:8px 16px',
     'font-size:14px',
     'font-weight:500',
-    'cursor:pointer'
+    'cursor:pointer',
   ].join(';');
   copyBtn.disabled = true;
 
@@ -115,7 +116,7 @@ function createOverlay() {
     'padding:8px 16px',
     'font-size:14px',
     'font-weight:500',
-    'cursor:pointer'
+    'cursor:pointer',
   ].join(';');
   moveBtn.disabled = true;
 
@@ -132,7 +133,7 @@ function createOverlay() {
     'padding:8px 16px',
     'font-size:14px',
     'font-weight:500',
-    'cursor:pointer'
+    'cursor:pointer',
   ].join(';');
   removeBtn.disabled = true;
 
@@ -147,7 +148,7 @@ function createOverlay() {
     'border-radius:18px',
     'padding:8px 16px',
     'font-size:14px',
-    'cursor:pointer'
+    'cursor:pointer',
   ].join(';');
   deselectBtn.addEventListener('click', function () {
     selectionState.clear();
@@ -161,7 +162,7 @@ function createOverlay() {
     'display:none',
     'font-size:18px',
     'animation:yt-bulk-spin 0.8s linear infinite',
-    'line-height:1'
+    'line-height:1',
   ].join(';');
 
   // Inject spinner keyframes once
@@ -190,7 +191,7 @@ function createOverlay() {
     'width:100%',
     'text-align:center',
     'font-size:13px',
-    'padding:2px 0'
+    'padding:2px 0',
   ].join(';');
 
   overlay.appendChild(message);
@@ -205,7 +206,7 @@ function createOverlay() {
   };
   document.addEventListener('yt-bulk-selection-changed', _selectionListener);
 
-    // Logger.info('Overlay created and appended to document.body');
+  // Logger.info('Overlay created and appended to document.body');
   return overlay;
 }
 
@@ -236,7 +237,6 @@ function syncOverlayVisibility(count) {
   var overlay = _overlayRef;
   if (!overlay) return;
 
-  var wasVisible = overlay.style.display === 'flex';
   overlay.style.display = count > 0 ? 'flex' : 'none';
 
   var badge = overlay.querySelector('#yt-bulk-count');
@@ -267,13 +267,16 @@ function showConfirmDialog(title, description, type, confirmLabel) {
     backdrop.id = 'yt-bulk-confirm-dialog';
     backdrop.style.cssText = [
       'position:fixed',
-      'top:0','left:0','right:0','bottom:0',
+      'top:0',
+      'left:0',
+      'right:0',
+      'bottom:0',
       'background:rgba(0,0,0,0.6)',
       'z-index:10000',
       'display:flex',
       'align-items:center',
       'justify-content:center',
-      'font-family:"Roboto","Arial",sans-serif'
+      'font-family:"Roboto","Arial",sans-serif',
     ].join(';');
 
     var boxCss = [
@@ -284,7 +287,7 @@ function showConfirmDialog(title, description, type, confirmLabel) {
       'max-width:520px',
       'width:92%',
       'box-shadow:0 8px 32px rgba(0,0,0,0.5)',
-      'text-align:center'
+      'text-align:center',
     ];
     if (isWarning) {
       boxCss.push('border:2px solid #ffaa00');
@@ -329,7 +332,7 @@ function showConfirmDialog(title, description, type, confirmLabel) {
       'border-radius:18px',
       'padding:10px 28px',
       'font-size:16px',
-      'cursor:pointer'
+      'cursor:pointer',
     ].join(';');
 
     var confirmBtn = document.createElement('button');
@@ -342,7 +345,7 @@ function showConfirmDialog(title, description, type, confirmLabel) {
       'padding:10px 28px',
       'font-size:16px',
       'font-weight:600',
-      'cursor:pointer'
+      'cursor:pointer',
     ].join(';');
 
     cancelBtn.addEventListener('click', function () {
@@ -370,9 +373,16 @@ function setOverlayLoading(isLoading) {
   var copyBtn = overlay.querySelector('#yt-bulk-copy-btn');
   var moveBtn = overlay.querySelector('#yt-bulk-move-btn');
   var removeBtn = overlay.querySelector('#yt-bulk-remove-btn');
-  if (copyBtn) copyBtn.disabled = isLoading || !getSelectedPlaylistId() || selectionState.getCount() === 0;
-  if (moveBtn) moveBtn.disabled = isLoading || !getSelectedPlaylistId() || selectionState.getCount() === 0 || !getCurrentPlaylistId();
-  if (removeBtn) removeBtn.disabled = isLoading || selectionState.getCount() === 0 || !getCurrentPlaylistId();
+  if (copyBtn)
+    copyBtn.disabled = isLoading || !getSelectedPlaylistId() || selectionState.getCount() === 0;
+  if (moveBtn)
+    moveBtn.disabled =
+      isLoading ||
+      !getSelectedPlaylistId() ||
+      selectionState.getCount() === 0 ||
+      !getCurrentPlaylistId();
+  if (removeBtn)
+    removeBtn.disabled = isLoading || selectionState.getCount() === 0 || !getCurrentPlaylistId();
 
   var spinner = overlay.querySelector('#yt-bulk-spinner');
   if (spinner) {
@@ -486,13 +496,16 @@ function showProgressDialog() {
   backdrop.id = 'yt-bulk-progress-dialog';
   backdrop.style.cssText = [
     'position:fixed',
-    'top:0','left:0','right:0','bottom:0',
+    'top:0',
+    'left:0',
+    'right:0',
+    'bottom:0',
     'background:rgba(0,0,0,0.6)',
     'z-index:10000',
     'display:flex',
     'align-items:center',
     'justify-content:center',
-    'font-family:"Roboto","Arial",sans-serif'
+    'font-family:"Roboto","Arial",sans-serif',
   ].join(';');
 
   var box = document.createElement('div');
@@ -504,7 +517,7 @@ function showProgressDialog() {
     'max-width:480px',
     'width:90%',
     'box-shadow:0 8px 32px rgba(0,0,0,0.5)',
-    'text-align:center'
+    'text-align:center',
   ].join(';');
 
   var titleEl = document.createElement('div');
@@ -518,7 +531,7 @@ function showProgressDialog() {
     'background:#444',
     'border-radius:4px',
     'overflow:hidden',
-    'margin-bottom:16px'
+    'margin-bottom:16px',
   ].join(';');
 
   var barInner = document.createElement('div');
@@ -528,7 +541,7 @@ function showProgressDialog() {
     'height:100%',
     'background:#065fd4',
     'border-radius:4px',
-    'transition:width 0.3s ease'
+    'transition:width 0.3s ease',
   ].join(';');
   barOuter.appendChild(barInner);
 
