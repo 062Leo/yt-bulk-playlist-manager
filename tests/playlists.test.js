@@ -137,6 +137,45 @@ describe('fetchUserPlaylists', () => {
     expect(JSON.parse(fetchMock.mock.calls[0][1].body).browseId).toBe('FEplaylist_aggregation');
   });
 
+  const grid = (items) => ({
+    contents: {
+      twoColumnBrowseResultsRenderer: {
+        tabs: [{ tabRenderer: { content: { richGridRenderer: { contents: items } } } }],
+      },
+    },
+  });
+  const gpr = (playlistId, text) => ({
+    gridPlaylistRenderer: { playlistId, title: { runs: [{ text }] } },
+  });
+
+  it('follows continuation tokens until no token is left', async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(grid([gpr('PL1', 'One'), cont('T1')])))
+      .mockResolvedValueOnce(jsonResponse(nextPage([gpr('PL2', 'Two'), cont('T2')])))
+      .mockResolvedValueOnce(jsonResponse(nextPage([gpr('PL3', 'Three'), gpr('PL1', 'One')])));
+    expect(await m.fetchUserPlaylists(SESSION)).toEqual([
+      { playlistId: 'PL1', title: 'One' },
+      { playlistId: 'PL2', title: 'Two' },
+      { playlistId: 'PL3', title: 'Three' },
+    ]);
+    const bodies = fetchMock.mock.calls.map((c) => JSON.parse(c[1].body));
+    expect(bodies.map((b) => b.continuation)).toEqual([undefined, 'T1', 'T2']);
+  });
+
+  it('stops at maxPages', async () => {
+    fetchMock.mockImplementation(async () => jsonResponse(nextPage([cont('again')])));
+    fetchMock.mockResolvedValueOnce(jsonResponse(grid([gpr('PL1', 'One'), cont('T1')])));
+    expect(await m.fetchUserPlaylists(SESSION, 3)).toEqual([{ playlistId: 'PL1', title: 'One' }]);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('keeps earlier pages when a continuation page fails', async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(grid([gpr('PL1', 'One'), cont('T1')])))
+      .mockResolvedValueOnce(jsonResponse({}, 500));
+    expect(await m.fetchUserPlaylists(SESSION)).toEqual([{ playlistId: 'PL1', title: 'One' }]);
+  });
+
   it('throws ParseError on unknown shapes', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ contents: {} }));
     await expect(m.fetchUserPlaylists(SESSION)).rejects.toMatchObject({ name: 'ParseError' });
