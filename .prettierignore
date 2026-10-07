@@ -1,4 +1,4 @@
 dist/
 node_modules/
-AGENTS.md
 coverage/
+package-lock.json
