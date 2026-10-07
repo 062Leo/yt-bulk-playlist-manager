@@ -37,6 +37,9 @@ const CONFIG = Object.freeze({
   /** Max browse pages (~100 videos each) scanned for the duplicate pre-check / setVideoId lookup. */
   PLAYLIST_SCAN_MAX_PAGES: 100,
 
+  /** Max browse pages loaded for the user's playlist list (import dialog dropdown). */
+  USER_PLAYLISTS_MAX_PAGES: 50,
+
   /** URL hash key used by SongVoyage: #sv-import=<base64url JSON>. */
   IMPORT_HASH_KEY: 'sv-import',
 
