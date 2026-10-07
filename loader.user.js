@@ -8,7 +8,7 @@
 // @grant        GM_xmlhttpRequest
 // @grant        unsafeWindow
 // @noframes
-// @run-at       document-idle
+// @run-at       document-start
 // @require      file:///C:/LEO/Projekte/GitHub/yt-bulk-playlist-manager/src/core/config.js
 // @require      file:///C:/LEO/Projekte/GitHub/yt-bulk-playlist-manager/src/core/logger.js
 // @require      file:///C:/LEO/Projekte/GitHub/yt-bulk-playlist-manager/src/core/errors.js

@@ -46,7 +46,7 @@ export function header(v) {
 // @grant        GM_xmlhttpRequest
 // @grant        unsafeWindow
 // @noframes
-// @run-at       document-idle
+// @run-at       document-start
 // ==/UserScript==
 `;
 }

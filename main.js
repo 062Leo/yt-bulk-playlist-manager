@@ -1,5 +1,9 @@
 // main.js – Application entry point; wires all modules together and handles SPA re-initialisation
 
+// Runs at document-start: grab the SongVoyage payload before YouTube can
+// rewrite the URL, and remove it so a reload does not import again.
+var _capturedImport = captureImportHash(window);
+
 var _initialising = false;
 var _initPending = false;
 var _buttonListenersWired = false;
@@ -10,6 +14,11 @@ function isPlaylistPage() {
 }
 
 async function init() {
+  if (document.readyState === 'loading') {
+    whenDomReady(init);
+    return;
+  }
+
   // Only fully initialise on playlist pages; on other YouTube pages we
   // just keep the SPA listener alive so navigation TO a playlist works.
   if (!isPlaylistPage()) {
@@ -527,6 +536,8 @@ setInterval(function () {
   }
 }, 1000);
 
-// Auto-start on first page load
-init();
-checkSongVoyageImport();
+// Auto-start: DOM work (toolbar, observer, dialogs) waits for the parsed DOM.
+whenDomReady(function () {
+  init();
+  checkSongVoyageImport(_capturedImport);
+});
